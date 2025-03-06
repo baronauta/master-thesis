@@ -2,7 +2,13 @@ function compute_effective_hamiltonian(choi_eigvals, EE)
     Ks = Vector{Matrix{ComplexF64}}()
     # push iniziale con Ks al tempo zero?
     for t in axes(EE, 1)
-        push!(Ks, -im/4. * sum([ choi_eigvals[t][k]*( tr(EE[t][k]) * EE[t][k]' - tr(EE[t][k]') * EE[t][k] ) for k in 1:size(choi_eigvals[t], 1) ]))
+        push!(
+            Ks,
+            -im / 4.0 * sum([
+                choi_eigvals[t][k] * (tr(EE[t][k]) * EE[t][k]' - tr(EE[t][k]') * EE[t][k])
+                for k = 1:size(choi_eigvals[t], 1)
+            ]),
+        )
     end
     return Ks
 end
@@ -35,12 +41,13 @@ function effective_hamiltonian_check(map_tomo_path)
     Ks_check = Vector{Matrix{ComplexF64}}()
     # push iniziale con Ks al tempo zero?
     for t in axes(EE, 1)
-        push!(Ks_check, -im/4. * 
-            sum([ 
+        push!(
+            Ks_check,
+            -im / 4.0 * sum([
                 T_basis[a]' * kraus_term(EE[t], choi_eigvals[t], T_basis[a]) -
-                kraus_term(EE[t], choi_eigvals[t], T_basis[a]) * T_basis[a]' 
-                for a in axes(T_basis,1) 
-            ])
+                kraus_term(EE[t], choi_eigvals[t], T_basis[a]) * T_basis[a]' for
+                a in axes(T_basis, 1)
+            ]),
         )
     end
     return Ks_check
@@ -48,5 +55,5 @@ end
 
 
 function internal_energy(Ks, rho)
-    return real(tr.(Ks.*rho[2:end])) # Ks(t=0) not defined
+    return real(tr.(Ks .* rho[2:end])) # Ks(t=0) not defined
 end
