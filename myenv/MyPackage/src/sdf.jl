@@ -26,7 +26,7 @@ function sdf_naming(sdf_eq::String)
         return "unknown"
     end
 end
-    
+
 
 function save_tedopa_coefficients(coefficients, sdf_filename)
     # Store coefficients inside directory sdf/chain_coefficients
@@ -58,7 +58,7 @@ function figs_sdf(sdf_filename)
     # parsing JSON data: parse the string s as a JSON object and assigns the resulting dictionary-like structure to p
     p = JSON.parse(s)
     # extracting parameters
-    a =  Float64.(p["environment"]["spectral_density_parameters"])
+    a = Float64.(p["environment"]["spectral_density_parameters"])
     support = Float64.(p["environment"]["domain"])
     # retrieves a string representing the spectral density function formula
     fn = p["environment"]["spectral_density_function"]
@@ -69,13 +69,18 @@ function figs_sdf(sdf_filename)
     # creating an ohmic spectral density function
     jOhmic(ω) = sdf(ω)
     # plot the spectral density function
-    xs = collect(range(support...,1000))
+    xs = collect(range(support..., 1000))
     ys = jOhmic.(xs)
     # Create and display the plot
-    p = plot(xs, ys, label=L"\alpha=%$(a[1]),\,\omega_c=%$(a[2])",
-        xlabel=L"\omega", ylabel=L"J(\omega)",
-        xlabelfontsize=16, ylabelfontsize=16,
-        grid=false
+    p = plot(
+        xs,
+        ys,
+        label = L"\alpha=%$(a[1]),\,\omega_c=%$(a[2])",
+        xlabel = L"\omega",
+        ylabel = L"J(\omega)",
+        xlabelfontsize = 16,
+        ylabelfontsize = 16,
+        grid = false,
     )
     mkpath("./sdf/figs")
     savefig("./sdf/figs/$(sdf_type)_a_" * string(a) * "_T_" * string(T) * ".json")
@@ -91,9 +96,9 @@ function figs_tedopa_coefficients(sdf_filename)
     # Plot
     freqs_x = collect(1:length(coefficients.frequencies))
     coups_x = collect(1:length(coefficients.couplings))
-    p = plot(freqs_x, coefficients.frequencies, label=L"\omega_n")
-    plot!(coups_x, coefficients.couplings, label=L"\kappa_n")
-    plot!(ylabel=L"\textbf{Chain coefficients}", xlabel=L"n")
+    p = plot(freqs_x, coefficients.frequencies, label = L"\omega_n")
+    plot!(coups_x, coefficients.couplings, label = L"\kappa_n")
+    plot!(ylabel = L"\textbf{Chain coefficients}", xlabel = L"n")
     # Save plot
     mkpath("./sdf/figs")
     savefig("./sdf/figs/$(sdf_type)_a_" * string(a) * "_T_" * string(T) * "_coeff.json")
