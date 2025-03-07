@@ -54,8 +54,7 @@ end
 
 function makedir_simul(sdf_filename, ϵ, Δ, dt, tmax, growMPSval, local_dim)
     # Load spectral density function parameters from SDF file
-    sdf_params(sdf_filename)
-    α, ωc, T, sdf_eq, chain_size = Float64.(sdf_dict["environment"]["spectral_density_parameters"])
+    α, ωc, T, sdf_eq, chain_size = sdf_params(sdf_filename)
     # Create directory to store data of simulation
     # ./runs/sdf_type/eps_x.x_Delta_x.x/a_x.x_T_x.x/timestamp
     sdf_type = sdf_naming(sdf_eq)
