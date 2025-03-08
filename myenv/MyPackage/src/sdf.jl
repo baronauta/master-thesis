@@ -59,9 +59,11 @@ function figs_sdf(sdf_filename)
     p = JSON.parse(s)
     # extracting parameters
     a = Float64.(p["environment"]["spectral_density_parameters"])
+    T = Float64(p["environment"]["temperature"])
     support = Float64.(p["environment"]["domain"])
     # retrieves a string representing the spectral density function formula
     fn = p["environment"]["spectral_density_function"]
+    sdf_type = sdf_naming(fn)
     # creating a callable function object tmp
     tmp = eval(Meta.parse("(a, x) -> " * fn))
     # defining a function sdf of one variable x. Calls the dynamically created function tmp
@@ -83,13 +85,13 @@ function figs_sdf(sdf_filename)
         grid = false,
     )
     mkpath("./sdf/figs")
-    savefig("./sdf/figs/$(sdf_type)_a_" * string(a) * "_T_" * string(T) * ".json")
+    savefig("./sdf/figs/$(sdf_type)_a_" * string(a[1]) * "_T_" * string(T) * ".png")
 end
 
 
 function figs_tedopa_coefficients(sdf_filename)
-    sdf_dict = load_sdf(sdf_filename)
-    T = Float64(sdf_dict["environment"]["temperature"])
+    α, ωc, T, sdf_eq, chain_size = sdf_params(sdf_filename)
+    sdf_type = sdf_naming(sdf_eq)
     # TEDOPA or T-TEDOPA according to temperature T
     coefficients =
         T == 0 ? chainmapping_tedopa(sdf_filename) : chainmapping_ttedopa(sdf_filename)
@@ -98,9 +100,8 @@ function figs_tedopa_coefficients(sdf_filename)
     coups_x = collect(1:length(coefficients.couplings))
     p = plot(freqs_x, coefficients.frequencies, label = L"\omega_n")
     plot!(coups_x, coefficients.couplings, label = L"\kappa_n")
-    plot!(ylabel = L"\textbf{Chain coefficients}", xlabel = L"n")
+    plot!(ylabel = L"\textbf{Chain\,\,\,coefficients}", xlabel = L"n")
     # Save plot
     mkpath("./sdf/figs")
-    savefig("./sdf/figs/$(sdf_type)_a_" * string(a) * "_T_" * string(T) * "_coeff.json")
+    savefig("./sdf/figs/$(sdf_type)_a_" * string(α) * "_T_" * string(T) * "_coeff.png")
 end
-

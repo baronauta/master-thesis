@@ -1,0 +1,10 @@
+{
+   "environment": {
+       "spectral_density_parameters": [0.3,1],
+       "spectral_density_function": "pi/2* a[1] * x * exp(-x/a[2])",
+       "domain": [0, 10],
+       "temperature": 0.04
+   },
+   "chain_length": 250,
+   "PolyChaos_nquad": 5000
+}
