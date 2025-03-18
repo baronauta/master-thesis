@@ -60,10 +60,20 @@ function evolve_tomographic_states(sdf_filename, config_file, dir_name)
 end
 
 
+function measurements_threshold_zero!(meas; threshold=1e-5)
+    meas[abs.(meas) .< threshold] .= 0
+    return meas
+end
+
+
 function get_evolved_states(filename)
     (rawdata, header) = readdlm(filename, ',', Float64, header = true)
     meas = Dict(header[i] => rawdata[:, i] for i in eachindex(header))
     nmeas = length(meas["time"])
+    # Apply thresholding to relevant measurements
+    for key in ["Sx{1}_re", "iSy{1}_im", "Sz{1}_re"]
+        meas[key] = measurements_threshold_zero!(meas[key])
+    end
     rho_t = [
         0.5 * (
             σ0 +

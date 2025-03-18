@@ -1,3 +1,22 @@
+function threshold_complex(z::ComplexF64, threshold::Float64)
+    re = abs(real(z)) < threshold ? 0.0 : real(z)
+    im = abs(imag(z)) < threshold ? 0.0 : imag(z)
+    return Complex(re, im)
+end
+
+
+function quantum_map_threshold_zero!(myMap; threshold=1e-5)
+    for M in myMap
+        for i in axes(M, 1), j in axes(M, 2)
+            if i != j 
+                M[i,j] = threshold_complex(M[i,j], threshold)
+            end
+        end
+    end
+    return myMap
+end
+
+
 function quantum_map(dir_path)
     # read meaurements data from file
     evolvedUp = get_evolved_states(dir_path * "/measurements_Up.dat")
@@ -10,15 +29,17 @@ function quantum_map(dir_path)
     evolved_σ2 = 2 * evolvedTrans - evolvedUp - evolvedDown
     evolved_σ3 = evolvedUp - evolvedDown
     # define and compute the quantum map
-    myMap = zeros(Complex{Float64}, length(evolvedUp), 4, 4)
-    for t = 1:length(evolvedUp)
+    myMap = Vector{Matrix{ComplexF64}}(undef, length(evolvedUp))
+    for t in 1:length(evolvedUp)
         evolved_basis = [evolved_σ0[t], evolved_σ1[t], evolved_σ2[t], evolved_σ3[t]]
+        myMap[t] = zeros(ComplexF64, 4, 4)
         for (i, σi) in enumerate(pauli_basis)
             for (j, evolved_σj) in enumerate(evolved_basis)
-                myMap[t, i, j] = 0.5 * tr(σi' * evolved_σj) # A' is the hermitian transpose of A
+                myMap[t][i, j] = 0.5 * tr(σi' * evolved_σj)  # A' is the hermitian transpose of A
             end
         end
     end
+    myMap = quantum_map_threshold_zero!(myMap)
     return myMap
 end
 
@@ -27,12 +48,12 @@ function generator(myMap, dt)
     # derivative of the map
     derivative = Vector{Matrix{ComplexF64}}()
     for t = 1:size(myMap, 1)-1
-        push!(derivative, (myMap[t+1, :, :] - myMap[t, :, :]) / dt) # forward difference
+        push!(derivative, (myMap[t+1] - myMap[t]) / dt) # forward difference
     end
     # inverse of the map
     inverse = Vector{Matrix{ComplexF64}}()
     for t = 1:size(derivative, 1)
-        push!(inverse, inv(myMap[t, :, :]))
+        push!(inverse, inv(myMap[t]))
     end
     # generator
     return derivative .* inverse
