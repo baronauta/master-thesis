@@ -144,7 +144,7 @@ function map_dynamics(map_tomo_path, init_state)
     myMap = quantum_map(map_tomo_path)
     vec_evolved_map = Vector{Vector{Complex{Float64}}}()
     for i = 1:size(myMap)[1]
-        push!(vec_evolved_map, myMap[i, :, :] * matrix2vector(init_state, pauli_basis))
+        push!(vec_evolved_map, myMap[i] * matrix2vector(init_state, pauli_basis))
     end
     return map(x -> vector2matrix(x, pauli_basis), vec_evolved_map)
 end
