@@ -1,21 +1,50 @@
-function threshold_complex(z::ComplexF64, threshold::Float64)
+# Pauli basis
+const σ0 = Complex{Float64}[1.0 0.0; 0.0 1.0]   # Identity matrix
+const σ1 = Complex{Float64}[0.0 1.0; 1.0 0.0]   # Pauli-X
+const σ2 = Complex{Float64}[0.0 -im; im 0.0]    # Pauli-Y
+const σ3 = Complex{Float64}[1.0 0.0; 0.0 -1.0]  # Pauli-Z
+const pauli_basis = [σ0, σ1, σ2, σ3]
+
+# Computational basis
+const T00 = Matrix{ComplexF64}([1.0 0.0; 0.0 0.0])
+const T01 = Matrix{ComplexF64}([0.0 1.0; 0.0 0.0])
+const T10 = Matrix{ComplexF64}([0.0 0.0; 1.0 0.0])
+const T11 = Matrix{ComplexF64}([0.0 0.0; 0.0 1.0])
+const T_basis = [T00, T01, T10, T11]
+
+
+function threshold_complex!(z::ComplexF64; threshold=1e-5)
     re = abs(real(z)) < threshold ? 0.0 : real(z)
     im = abs(imag(z)) < threshold ? 0.0 : imag(z)
     return Complex(re, im)
 end
 
 
-function quantum_map_threshold_zero!(myMap; threshold=1e-5)
-    for M in myMap
-        for i in axes(M, 1), j in axes(M, 2)
-            if i != j 
-                M[i,j] = threshold_complex(M[i,j], threshold)
-            end
-        end
+function threshold_zero!(matrix::Matrix{ComplexF64})
+    for i in axes(matrix, 1), j in axes(matrix, 2)
+        matrix[i,j] = threshold_complex!(matrix[i,j])
+        # if i != j 
+        #     M[i,j] = threshold_complex!(M[i,j], threshold)
+        # end
     end
-    return myMap
+    return matrix
 end
 
+function threshold_zero!(vector::Vector{ComplexF64})
+    for i in axes(vector,1)
+        vector[i] = threshold_complex!(vector[i])
+    end
+    return vector
+end
+
+function threshold_zero!(nested_vec::Vector{Vector{Matrix{ComplexF64}}})
+    for vec in nested_vec
+        for mat in vec
+            threshold_zero!(mat)
+        end
+    end
+    return nested_vec
+end
 
 function quantum_map(dir_path)
     # read meaurements data from file
@@ -39,12 +68,12 @@ function quantum_map(dir_path)
             end
         end
     end
-    myMap = quantum_map_threshold_zero!(myMap)
+    myMap = threshold_zero!.(myMap)
     return myMap
 end
 
 
-function generator(myMap, dt)
+function generator(myMap::Vector{Matrix{ComplexF64}}, dt)
     # derivative of the map
     derivative = Vector{Matrix{ComplexF64}}()
     for t = 1:size(myMap, 1)-1
@@ -122,6 +151,8 @@ function kraus_decomposition(myGen)
         end
         push!(EE, E)
     end
+    choi_eigvals = threshold_zero!.(choi_eigvals)
+    EE = threshold_zero!(EE)
     return choi_eigvals, EE
 end
 

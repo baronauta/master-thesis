@@ -1,4 +1,4 @@
-function compute_effective_hamiltonian(choi_eigvals, EE)
+function effective_hamiltonian(choi_eigvals::Vector{Vector{ComplexF64}}, EE::Vector{Vector{Matrix{ComplexF64}}})
     Ks = Vector{Matrix{ComplexF64}}()
     # push iniziale con Ks al tempo zero?
     for t in axes(EE, 1)
@@ -24,7 +24,7 @@ function effective_hamiltonian(map_tomo_path)
     # choi matrix of the generator and then kraus decomposition
     choi_eigvals, EE = kraus_decomposition(myGen)
     # effective hamiltonian
-    return compute_effective_hamiltonian(choi_eigvals, EE)
+    return effective_hamiltonian(choi_eigvals, EE)
 end
 
 

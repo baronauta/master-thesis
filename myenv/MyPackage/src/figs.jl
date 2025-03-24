@@ -37,7 +37,7 @@ function fig_tomo(map_tomo_path)
         plot!(p[i], ts, real(map(x -> tr(σ3 * x), rho)), label = L"\langle\sigma_z\rangle")
         plot!(p[i], ts, norm, label = L"Tr(\rho)", lc = :gray)
     end
-
+    display(p)
     savefig(figs_path * "/tomostates_dynamics.png")
 end
 
@@ -77,7 +77,7 @@ function fig_Ks(map_tomo_path, row_idx, col_idx; t_max = Inf)
     )
 
     plot!(p, plot_title = L"\epsilon=%$(config.ϵ),\,\Delta=%$(config.Δ)")
-
+    display(p)
     savefig(figs_path * "/Ks" * string(row_idx) * string(col_idx) * ".png")
 end
 
@@ -104,6 +104,6 @@ function fig_Us(map_tomo_path; t_max = Inf)
         plot!(p[i], title = title, xlabel = L"t", ylabel = L"Tr(\rho K_s)")
         plot!(p[i], ts_filtered, Us_filtered, legend = false)
     end
-
+    display(p)
     savefig(figs_path * "/internal_energy_tomostates.png")
 end

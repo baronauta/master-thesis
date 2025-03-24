@@ -12,9 +12,6 @@ using LinearAlgebra
 using Plots
 using TEDOPA
 
-
-include("basis.jl")
-
 include("io_utils.jl")
 
 export figs_sdf, figs_tedopa_coefficients
