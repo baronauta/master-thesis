@@ -79,8 +79,8 @@ function quantum_map(dir_path)
             end
         end
     end
-    # myMap = threshold_zero!.(myMap)
-    myMap = silly_threshold.(myMap)
+    myMap = threshold_zero!.(myMap)
+    # myMap = silly_threshold.(myMap)
     return myMap
 end
 
