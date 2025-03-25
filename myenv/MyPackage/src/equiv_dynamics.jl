@@ -13,7 +13,7 @@ const T11 = Matrix{ComplexF64}([0.0 0.0; 0.0 1.0])
 const T_basis = [T00, T01, T10, T11]
 
 
-function threshold_complex!(z::ComplexF64; threshold=1e-5)
+function threshold_complex!(z::ComplexF64; threshold=1e-6)
     re = abs(real(z)) < threshold ? 0.0 : real(z)
     im = abs(imag(z)) < threshold ? 0.0 : imag(z)
     return Complex(re, im)
@@ -23,10 +23,21 @@ end
 function threshold_zero!(matrix::Matrix{ComplexF64})
     for i in axes(matrix, 1), j in axes(matrix, 2)
         matrix[i,j] = threshold_complex!(matrix[i,j])
-        # if i != j 
-        #     M[i,j] = threshold_complex!(M[i,j], threshold)
-        # end
     end
+    return matrix
+end
+
+function silly_threshold(matrix::Matrix{ComplexF64})
+    # blocco in alto a dx
+    matrix[1,3] = 0
+    matrix[1,4] = 0
+    matrix[2,3] = 0
+    matrix[2,4] = 0
+    # blocco in basso a sx
+    matrix[3,1] = 0
+    matrix[3,2] = 0
+    matrix[4,1] = 0
+    matrix[4,2] = 0
     return matrix
 end
 
@@ -68,7 +79,8 @@ function quantum_map(dir_path)
             end
         end
     end
-    myMap = threshold_zero!.(myMap)
+    # myMap = threshold_zero!.(myMap)
+    myMap = silly_threshold.(myMap)
     return myMap
 end
 
@@ -151,7 +163,7 @@ function kraus_decomposition(myGen)
         end
         push!(EE, E)
     end
-    choi_eigvals = threshold_zero!.(choi_eigvals)
+    # choi_eigvals = threshold_zero!.(choi_eigvals)
     EE = threshold_zero!(EE)
     return choi_eigvals, EE
 end
