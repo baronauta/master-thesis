@@ -1,3 +1,58 @@
+function figs_sdf(sdf_filename)
+    # open and read the JSON file
+    input = open(sdf_filename)
+    s = read(input, String)
+    # parsing JSON data: parse the string s as a JSON object and assigns the resulting dictionary-like structure to p
+    p = JSON.parse(s)
+    # extracting parameters
+    a = Float64.(p["environment"]["spectral_density_parameters"])
+    T = Float64(p["environment"]["temperature"])
+    support = Float64.(p["environment"]["domain"])
+    # retrieves a string representing the spectral density function formula
+    fn = p["environment"]["spectral_density_function"]
+    sdf_type = sdf_naming(fn)
+    # creating a callable function object tmp
+    tmp = eval(Meta.parse("(a, x) -> " * fn))
+    # defining a function sdf of one variable x. Calls the dynamically created function tmp
+    sdf = x -> Base.invokelatest(tmp, a, x)
+    # creating an ohmic spectral density function
+    jOhmic(ω) = sdf(ω)
+    # plot the spectral density function
+    xs = collect(range(support..., 1000))
+    ys = jOhmic.(xs)
+    # Create and display the plot
+    p = plot(
+        xs,
+        ys,
+        label = L"\alpha=%$(a[1]),\,\omega_c=%$(a[2])",
+        xlabel = L"\omega",
+        ylabel = L"J(\omega)",
+        xlabelfontsize = 16,
+        ylabelfontsize = 16,
+        grid = false,
+    )
+    mkpath("./sdf/figs")
+    savefig("./sdf/figs/$(sdf_type)_a_" * string(a[1]) * "_T_" * string(T) * ".png")
+end
+
+
+function figs_tedopa_coefficients(sdf_filename)
+    α, ωc, T, sdf_eq, chain_size = sdf_params(sdf_filename)
+    sdf_type = sdf_naming(sdf_eq)
+    # TEDOPA or T-TEDOPA according to temperature T
+    coefficients =
+        T == 0 ? chainmapping_tedopa(sdf_filename) : chainmapping_ttedopa(sdf_filename)
+    # Plot
+    freqs_x = collect(1:length(coefficients.frequencies))
+    coups_x = collect(1:length(coefficients.couplings))
+    p = plot(freqs_x, coefficients.frequencies, label = L"\omega_n")
+    plot!(coups_x, coefficients.couplings, label = L"\kappa_n")
+    plot!(ylabel = L"\textbf{Chain\,\,\,coefficients}", xlabel = L"n")
+    # Save plot
+    mkpath("./sdf/figs")
+    savefig("./sdf/figs/$(sdf_type)_a_" * string(α) * "_T_" * string(T) * "_coeff.png")
+end
+
 function makedir_figs(map_tomo_path)
     # Create the directory figs
     figs_path = map_tomo_path * "/figs"

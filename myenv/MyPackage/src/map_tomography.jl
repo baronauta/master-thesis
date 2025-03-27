@@ -8,7 +8,7 @@ function sdf_params(sdf_filename)
     # Environment
     α, ωc = Float64.(sdf_dict["environment"]["spectral_density_parameters"])
     sdf_eq = String(sdf_dict["environment"]["spectral_density_function"])
-    domain = Float64.(sdf.dict["environment"]["domain"])
+    domain = Float64.(sdf_dict["environment"]["domain"])
     T = Float64(sdf_dict["environment"]["temperature"])
     # Chain length
     chain_length = Int64(sdf_dict["chain_length"])
@@ -124,7 +124,7 @@ function makedir_simul(sdf_filename, ϵ, Δ, dt, tmax, growMPSval, local_dim)
     mkpath(dir_name)
     println("Simulation results will be stored in $(dir_name)")
     # Create and save the configuration file inside dir_name
-    config_file = dir_name * "\config.json"
+    config_file = dir_name * "/config.json"
     save_config(
         config_file,
         α,
@@ -140,7 +140,7 @@ function makedir_simul(sdf_filename, ϵ, Δ, dt, tmax, growMPSval, local_dim)
         growMPSval,
         local_dim,
     )
-    return dir_name
+    return dir_name, config_file
 end
 
 "Evolve the states forming the tomographic basis."
@@ -207,5 +207,5 @@ function map_tomography(
     dir_name, config_file =
         makedir_simul(sdf_filename, ϵ, Δ, dt, tmax, growMPSval, local_dim)
     # Evolve tomographic states
-    evolve_tomographic_states(sdf_filename, config_file, dir_name)
+    evolve_tomographic_states(dir_name, sdf_filename, config_file)
 end
