@@ -11,7 +11,7 @@
 cd ${SLURM_SUBMIT_DIR}
 echo ${SLURM_SUBMIT_DIR}
 
-MKL_NUM_THREADS=2 julia "map_tomography.jl"
+MKL_NUM_THREADS=2 julia myscript
 
 echo "calculation finished"
 exit 0
