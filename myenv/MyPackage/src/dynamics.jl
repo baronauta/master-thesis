@@ -12,63 +12,42 @@ const T10 = Matrix{ComplexF64}([0.0 0.0; 1.0 0.0])
 const T11 = Matrix{ComplexF64}([0.0 0.0; 0.0 1.0])
 const T_basis = [T00, T01, T10, T11]
 
-
-function threshold_complex!(z::ComplexF64; threshold=1e-5)
-    re = abs(real(z)) < threshold ? 0.0 : real(z)
-    im = abs(imag(z)) < threshold ? 0.0 : imag(z)
-    return Complex(re, im)
+"Read measurements from file and return the evolved state for each time."
+function get_evolved_states(filename)
+    (rawdata, header) = readdlm(filename, ',', Float64, header = true)
+    meas = Dict(header[i] => rawdata[:, i] for i in eachindex(header))
+    nmeas = length(meas["time"])
+    rho_t = [
+        0.5 * (
+            σ0 +
+            2 * meas["Sx{1}_re"][i] * σ1 +
+            2 * meas["iSy{1}_im"][i] * σ2 +
+            2 * meas["Sz{1}_re"][i] * σ3
+        ) for i = 1:nmeas
+    ]
+    return rho_t
 end
 
-
-function threshold_zero!(matrix::Matrix{ComplexF64})
-    for i in axes(matrix, 1), j in axes(matrix, 2)
-        matrix[i,j] = threshold_complex!(matrix[i,j])
-    end
-    return matrix
+"Read the normalization of the time evolved state: if everything works good it should be 1."
+function get_norm(filename)
+    (rawdata, header) = readdlm(filename, ',', Float64, header = true)
+    meas = Dict(header[i] => rawdata[:, i] for i in eachindex(header))
+    return meas["Norm_re"]
 end
 
-function silly_threshold(matrix::Matrix{ComplexF64})
-    # blocco in alto a dx
-    matrix[1,3] = 0
-    matrix[1,4] = 0
-    matrix[2,3] = 0
-    matrix[2,4] = 0
-    # blocco in basso a sx
-    matrix[3,1] = 0
-    matrix[3,2] = 0
-    matrix[4,1] = 0
-    matrix[4,2] = 0
-    return matrix
-end
-
-function threshold_zero!(vector::Vector{ComplexF64})
-    for i in axes(vector,1)
-        vector[i] = threshold_complex!(vector[i])
-    end
-    return vector
-end
-
-function threshold_zero!(nested_vec::Vector{Vector{Matrix{ComplexF64}}})
-    for vec in nested_vec
-        for mat in vec
-            threshold_zero!(mat)
-        end
-    end
-    return nested_vec
-end
-
+"Compute the quantum map in the Pauli basis."
 function quantum_map(dir_path)
-    # read meaurements data from file
+    # Read meaurements data from file
     evolvedUp = get_evolved_states(dir_path * "/measurements_Up.dat")
     evolvedDown = get_evolved_states(dir_path * "/measurements_Dn.dat")
     evolvedPlus = get_evolved_states(dir_path * "/measurements_+.dat")
     evolvedTrans = get_evolved_states(dir_path * "/measurements_i.dat")
-    # evolved pauli basis is retrieved from the known time evolution of the tomographic basis
+    # Evolved Pauli basis is retrieved from the known time evolution of the tomographic basis
     evolved_σ0 = evolvedUp + evolvedDown
     evolved_σ1 = 2 * evolvedPlus - evolvedUp - evolvedDown
     evolved_σ2 = 2 * evolvedTrans - evolvedUp - evolvedDown
     evolved_σ3 = evolvedUp - evolvedDown
-    # define and compute the quantum map
+    # Define and compute the quantum map
     myMap = Vector{Matrix{ComplexF64}}(undef, length(evolvedUp))
     for t in 1:length(evolvedUp)
         evolved_basis = [evolved_σ0[t], evolved_σ1[t], evolved_σ2[t], evolved_σ3[t]]
@@ -79,12 +58,10 @@ function quantum_map(dir_path)
             end
         end
     end
-    myMap = threshold_zero!.(myMap)
-    # myMap = silly_threshold.(myMap)
     return myMap
 end
 
-
+"Compute the generator of the dynamics."
 function generator(myMap::Vector{Matrix{ComplexF64}}, dt)
     # derivative of the map
     derivative = Vector{Matrix{ComplexF64}}()
@@ -100,7 +77,7 @@ function generator(myMap::Vector{Matrix{ComplexF64}}, dt)
     return derivative .* inverse
 end
 
-
+"Change basis and compute the choi matrix of the dynamics."
 function choi_matrix(myGen)
     # change of basis (Λ)ij = << σi | T >>
     # ATT! Inner product tr(A'*B); pauli/sqrt(2) is orthonormal, T is orthonormal
@@ -167,6 +144,67 @@ function kraus_decomposition(myGen)
     EE = threshold_zero!(EE)
     return choi_eigvals, EE
 end
+
+function effective_hamiltonian(choi_eigvals::Vector{Vector{ComplexF64}}, EE::Vector{Vector{Matrix{ComplexF64}}})
+    Ks = Vector{Matrix{ComplexF64}}()
+    # push iniziale con Ks al tempo zero?
+    for t in axes(EE, 1)
+        push!(
+            Ks,
+            -im / 4.0 * sum([
+                choi_eigvals[t][k] * (tr(EE[t][k]) * EE[t][k]' - tr(EE[t][k]') * EE[t][k])
+                for k = 1:size(choi_eigvals[t], 1)
+            ]),
+        )
+    end
+    return Ks
+end
+
+
+function effective_hamiltonian(map_tomo_path)
+    # read config file
+    config_path = map_tomo_path * "/config.JSON"
+    config = load_config(config_path)
+    # compute the map and its generator
+    myMap = quantum_map(map_tomo_path)
+    myGen = generator(myMap, config.dt)
+    # choi matrix of the generator and then kraus decomposition
+    choi_eigvals, EE = kraus_decomposition(myGen)
+    # effective hamiltonian
+    return effective_hamiltonian(choi_eigvals, EE)
+end
+
+
+function effective_hamiltonian_check(map_tomo_path)
+    # read config file
+    config_path = map_tomo_path * "/config.JSON"
+    config = load_config(config_path)
+    # compute the map and its generator
+    myMap = quantum_map(map_tomo_path)
+    myGen = generator(myMap, config.dt)
+    # choi matrix of the generator and then kraus decomposition
+    choi_eigvals, EE = kraus_decomposition(myGen)
+    # effective hamiltonian
+    Ks_check = Vector{Matrix{ComplexF64}}()
+    # push iniziale con Ks al tempo zero?
+    for t in axes(EE, 1)
+        push!(
+            Ks_check,
+            -im / 4.0 * sum([
+                T_basis[a]' * kraus_term(EE[t], choi_eigvals[t], T_basis[a]) -
+                kraus_term(EE[t], choi_eigvals[t], T_basis[a]) * T_basis[a]' for
+                a in axes(T_basis, 1)
+            ]),
+        )
+    end
+    return Ks_check
+end
+
+
+function internal_energy(Ks, rho)
+    return real(tr.(Ks .* rho[2:end])) # Ks(t=0) not defined
+end
+
 
 
 function matrix2vector(mat::Matrix{Complex{Float64}}, basis)

@@ -12,19 +12,12 @@ using LinearAlgebra
 using Plots
 using TEDOPA
 
-include("io_utils.jl")
-
-export figs_sdf, figs_tedopa_coefficients
-include("sdf.jl")
-
 include("spin_boson_model.jl")
 
 export map_tomography
 include("map_tomography.jl")
 
-include("equiv_dynamics.jl")
-
-include("effective_hamiltonian.jl")
+include("dynamics.jl")
 
 export fig_tomo, fig_Ks, fig_Us
 include("figs.jl")
