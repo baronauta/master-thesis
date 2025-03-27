@@ -73,18 +73,18 @@ function load_config(filename)
 end
 
 "Compute tedopa coeffiecients using external library TEDOPA and save them into files in path ./sdf/chain_coefficients."
-function tedopa_coefficients(config_file, sdf_filename)
+function tedopa_coefficients(dir, sdf_filename, config_file)
     config = load_config(config_file)
     # Compute TEDOPA or T-TEDOPA coefficients according to temperature T
     coefficients =
         config.T == 0 ? chainmapping_tedopa(sdf_filename) : chainmapping_ttedopa(sdf_filename)
     # Save coefficients into files
-    dir = "./sdf/chain_coefficients"
-    mkpath(dir)
+    newdir = dir * "/sdf/chain_coefficients"
+    mkpath(newdir)
     # Extract base filename without directory and extension
     base_filename = splitext(basename(sdf_filename))[1]
-    freqs_file = dir * "/$(base_filename)_freqs.csv"
-    coups_file = dir * "/$(base_filename)_coups.csv"
+    freqs_file = newdir * "/$(base_filename)_freqs.csv"
+    coups_file = newdir * "/$(base_filename)_coups.csv"
     # Frequencies
     io = open(freqs_file, "w")
     for x in coefficients.frequencies
@@ -99,8 +99,6 @@ function tedopa_coefficients(config_file, sdf_filename)
     close(io)
     return freqs_file, coups_file
 end
-
-
 
 "Prepare the directory to store data from the simulation. Desidered format is ./runs/sdf_type/eps_x.x_Delta_x.x/a_x.x_T_x.x/timestamp."
 function makedir_simul(sdf_filename, ϵ, Δ, dt, tmax, growMPSval, local_dim)
@@ -150,7 +148,7 @@ function evolve_tomographic_states(dir, sdf_filename, config_file)
     # Measurement step is equal to integration step
     dt_meas = dt_step
     # Compute TEDOPA coefficients
-    freqs_file, coups_file = tedopa_coefficients(config_file, sdf_filename)
+    freqs_file, coups_file = tedopa_coefficients(dir, sdf_filename, config_file)
     # Evolve tomographic states
     tomoStates = ["Up", "Dn", "+", "i"]
     for case in tomoStates
