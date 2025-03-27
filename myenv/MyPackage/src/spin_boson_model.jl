@@ -1,28 +1,29 @@
+"""
+    defineSystem(; sys_type::String="S=1/2", sys_istate::String="Up", chain_length::Int64=250, local_dim::Int64=6)
+
+Standard approach: the initial system-environment state is factorized, and the chain is always in the vacuum state.
+
+By default, this function considers:
+- A two-level system (TLS) (`sys_type="S=1/2"`) in the excited state (`sys_istate="Up"`).
+- A chain of "Boson" with length `chain_length` and local dimension `local_dim`.
+
+# Returns
+- `sysenv::Vector{<:Index}`: A vector that combines the system and environment indices.
+- `psi0`: An MPS (Matrix Product State) representation of the initial state.
+"""
 function defineSystem(;
     sys_type::String = "S=1/2",
     sys_istate::String = "Up",
-    chain_size::Int64 = 250,
+    chain_length::Int64 = 250,
     local_dim::Int64 = 6,
 )
-
-    """
-    Standard approach: initial sysenv state factorized, chain always in the vacuum state.
-    By dafault consider:
-        - TLS system (sys_type::String="S=1/2") in the excited state (sys_istate::String="Up")
-        - chain of "Boson" with length `chain_size` and local dimension `local_dim`
-    
-    Returns:
-        - `sysenv` vector that combines the system and the environment indices
-        - `psi0` MPS representation of the initial state
-    """
-
     sys = siteinds(sys_type, 1)
-    env = siteinds("Boson", dim = local_dim, chain_size)
+    env = siteinds("Boson", dim = local_dim, chain_length)
     sysenv = vcat(sys, env)
 
     stateSys = [sys_istate]
 
-    stateEnv = ["0" for n = 1:chain_size] # chain in the vacuum state
+    stateEnv = ["0" for n = 1:chain_length] # chain in the vacuum state
 
     stateSE = vcat(stateSys, stateEnv)
 
@@ -31,7 +32,12 @@ function defineSystem(;
     return (sysenv, psi0)
 end
 
+"""
+Create the MPO of the overall hamiltonian with hamiltonian of interaction given by S_k ⊗ ( b†{2} + b{2} )
 
+Returns:
+    - MPO(mpo,sysenv) i.e. MPO representation of the overall hamiltonian
+"""
 function createMPO(
     sysenv,
     eps::Float64,
@@ -40,14 +46,6 @@ function createMPO(
     freqfile::String,
     coupfile::String,
 )::MPO
-
-    """
-    Create the MPO of the overall hamiltonian with hamiltonian of interaction given by S_k ⊗ ( b†{2} + b{2} )
-    
-    Returns:
-        - MPO(mpo,sysenv) i.e. MPO representation of the overall hamiltonian
-    """
-
     # to check what interaction I am considering calling this function
     println("system-bath interaction: ", intHsysSide, " ⊗ ( b†{2} + b{2} )")
 

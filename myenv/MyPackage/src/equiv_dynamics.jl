@@ -13,7 +13,7 @@ const T11 = Matrix{ComplexF64}([0.0 0.0; 0.0 1.0])
 const T_basis = [T00, T01, T10, T11]
 
 
-function threshold_complex!(z::ComplexF64; threshold=1e-6)
+function threshold_complex!(z::ComplexF64; threshold=1e-5)
     re = abs(real(z)) < threshold ? 0.0 : real(z)
     im = abs(imag(z)) < threshold ? 0.0 : imag(z)
     return Complex(re, im)
