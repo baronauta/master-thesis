@@ -15,6 +15,21 @@ function sdf_params(sdf_filename)
     return α, ωc, sdf_eq, domain, T, chain_length
 end
 
+"Inspect tedopa coefficients: compute the asymptotic value of the couplings and use rule-of-thumb for determing dt and chain_length for the simulation."
+function inspect_tedopa_coefficients(sdf_filename, t_max)
+    α, ωc, sdf_eq, domain, T, chain_length = sdf_params(sdf_filename)
+    # TEDOPA or T-TEDOPA according to temperature T
+    coefficients =
+        T == 0 ? chainmapping_tedopa(sdf_filename) : chainmapping_ttedopa(sdf_filename)
+    # Suggested parameter for simulation
+    k_∞ = coefficients.couplings[end]
+    suggested_dt = 1 / (k_∞ * 50)
+    suggested_N_chain = 2 * k_∞ * t_max
+    println("k∞: ", k_∞)
+    println("Suggested dt: ", suggested_dt)
+    println("Suggested chain length: ", round(Int, suggested_N_chain))
+end
+
 "Create and fill a file with all the parameters that defines a simulation."
 function save_config(
     config_file,

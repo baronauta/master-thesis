@@ -14,12 +14,12 @@ using TEDOPA
 
 include("spin_boson_model.jl")
 
-export map_tomography
+export inspect_tedopa_coefficients, map_tomography
 include("map_tomography.jl")
 
 include("dynamics.jl")
 
-export fig_tomo, fig_Ks, fig_Us
+export fig_sdf, fig_tomo, fig_trdistance, fig_Ks, fig_Us
 include("figs.jl")
 
 export check_tomostates_dynamics, check_Ks

@@ -140,8 +140,6 @@ function kraus_decomposition(myGen)
         end
         push!(EE, E)
     end
-    # choi_eigvals = threshold_zero!.(choi_eigvals)
-    EE = threshold_zero!(EE)
     return choi_eigvals, EE
 end
 

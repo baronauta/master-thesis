@@ -10,7 +10,7 @@ function makedir_figs(dir_data)
 end
 
 "Plot the spectral density function."
-function figs_sdf(dir_data)
+function fig_sdf(dir_data)
     figs_path, config = makedir_figs(dir_data)
     # Extracting parameters
     a = config.α
@@ -42,7 +42,7 @@ function figs_sdf(dir_data)
     savefig(figs_path * "/sdf.png")
 end
 
-"Plot tedopa coefficients."
+"Plot tedopa coefficients. Read from sdf_filename. Display the graph and returns interesting values for setting simulation."
 ### Rifare leggendo da directory dove dovrebbero esserci già file da leggere con i coefficienti
 function figs_tedopa_coefficients(sdf_filename)
     α, ωc, T, sdf_eq, chain_size = sdf_params(sdf_filename)
@@ -104,14 +104,15 @@ function fig_trdistance(dir_data)
     evolvedPlus = get_evolved_states(dir_data * "/measurements_+.dat")
     evolvedTrans = get_evolved_states(dir_data * "/measurements_i.dat")
     p = plot(legend = :topright)
-    ts = config.dt * (1:length(rho))
+    ts = config.dt * (1:length(evolvedUp))
     plot!(p, title = "Trace-distance between tomographic states", xlabel = L"t")
-    plot!(p, ts, trace_distance.(evolvedUp, evolvedDown), label = "Up - Down")
-    plot!(p, ts, trace_distance.(evolvedUp, evolvedPlus), label = "Up - Plus")
-    plot!(p, ts, trace_distance.(evolvedUp, evolvedTrans), label = "Up - Trans")
-    plot!(p, ts, trace_distance.(evolvedDown, evolvedPlus), label = "Down - Plus")
-    plot!(p, ts, trace_distance.(evolvedDown, evolvedTrans), label = "Down - Trans")
-    plot!(p, ts, trace_distance.(evolvedPlus, evolvedTrans), label = "Plus - Trans")
+    plot!(p, ts, trace_distance.(evolvedUp, evolvedDown), label = L"d_{Tr}(Up,Down)")
+    plot!(p, ts, trace_distance.(evolvedUp, evolvedPlus), label = L"d_{Tr}(Up,Plus)")
+    plot!(p, ts, trace_distance.(evolvedUp, evolvedTrans), label = L"d_{Tr}(Up,Trans)")
+    plot!(p, ts, trace_distance.(evolvedDown, evolvedPlus), label = L"d_{Tr}(Down,Plus)")
+    plot!(p, ts, trace_distance.(evolvedDown, evolvedTrans), label = L"d_{Tr}(Down,Trans)")
+    plot!(p, ts, trace_distance.(evolvedPlus, evolvedTrans), label = L"d_{Tr}(Plus,Trans)")
+    plot!(p, ylims=(0,1))
     display(p)
     savefig(figs_path * "/tr_distance.png")
 end
@@ -158,7 +159,6 @@ function fig_Ks(dir_data, row_idx, col_idx; t_max = Inf)
         grid = false,
         label = L"\alpha=%$(config.α),\,T=%$(config.T)",
     )
-
     plot!(p, plot_title = L"\epsilon=%$(config.ϵ),\,\Delta=%$(config.Δ)")
     display(p)
     savefig(figs_path * "/Ks" * string(row_idx) * string(col_idx) * ".png")
