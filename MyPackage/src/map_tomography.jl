@@ -1,35 +1,3 @@
-"Return all the parameters about environment and chain length from sdf JSON file."
-function sdf_params(sdf_filename)
-    # Open the JSON file and parse the dictionary
-    input = open(sdf_filename)
-    s = read(input, String)
-    sdf_dict = JSON.parse(s)
-    # Read all parameters
-    # Environment
-    α, ωc = Float64.(sdf_dict["environment"]["spectral_density_parameters"])
-    sdf_eq = String(sdf_dict["environment"]["spectral_density_function"])
-    domain = Float64.(sdf_dict["environment"]["domain"])
-    T = Float64(sdf_dict["environment"]["temperature"])
-    # Chain length
-    chain_length = Int64(sdf_dict["chain_length"])
-    return α, ωc, sdf_eq, domain, T, chain_length
-end
-
-"Inspect tedopa coefficients: compute the asymptotic value of the couplings and use rule-of-thumb for determing dt and chain_length for the simulation."
-function inspect_tedopa_coefficients(sdf_filename, t_max)
-    α, ωc, sdf_eq, domain, T, chain_length = sdf_params(sdf_filename)
-    # TEDOPA or T-TEDOPA according to temperature T
-    coefficients =
-        T == 0 ? chainmapping_tedopa(sdf_filename) : chainmapping_ttedopa(sdf_filename)
-    # Suggested parameter for simulation
-    k_∞ = coefficients.couplings[end]
-    suggested_dt = 1 / (k_∞ * 50)
-    suggested_N_chain = 2 * k_∞ * t_max
-    println("k∞: ", k_∞)
-    println("Suggested dt: ", suggested_dt)
-    println("Suggested chain length: ", round(Int, suggested_N_chain))
-end
-
 "Create and fill a file with all the parameters that defines a simulation."
 function save_config(
     config_file,
@@ -87,19 +55,10 @@ function load_config(filename)
     )
 end
 
-"Compute tedopa coeffiecients using external library TEDOPA and save them into files in path ./sdf/chain_coefficients."
-function tedopa_coefficients(dir, sdf_filename, config_file)
-    config = load_config(config_file)
-    # Compute TEDOPA or T-TEDOPA coefficients according to temperature T
-    coefficients =
-        config.T == 0 ? chainmapping_tedopa(sdf_filename) : chainmapping_ttedopa(sdf_filename)
-    # Save coefficients into files
-    newdir = dir * "/sdf/chain_coefficients"
-    mkpath(newdir)
-    # Extract base filename without directory and extension
-    base_filename = splitext(basename(sdf_filename))[1]
-    freqs_file = newdir * "/$(base_filename)_freqs.csv"
-    coups_file = newdir * "/$(base_filename)_coups.csv"
+""
+function save_tedopa_coefficients(coefficients, save_to_dir, sdf_name)
+    freqs_file = save_to_dir * "/$(sdf_name)_freqs.csv"
+    coups_file = save_to_dir * "/$(sdf_name)_coups.csv"
     # Frequencies
     io = open(freqs_file, "w")
     for x in coefficients.frequencies
@@ -115,29 +74,32 @@ function tedopa_coefficients(dir, sdf_filename, config_file)
     return freqs_file, coups_file
 end
 
-"Prepare the directory to store data from the simulation. Desidered format is ./runs/sdf_type/eps_x.x_Delta_x.x/a_x.x_T_x.x/timestamp."
-function makedir_simul(sdf_filename, ϵ, Δ, dt, tmax, growMPSval, local_dim)
-    # Load spectral density function parameters from SDF file
-    α, ωc, sdf_eq, domain, T, chain_length = sdf_params(sdf_filename)
-    # Choose the name associated to the sdf
-    if sdf_eq == "pi/2* a[1] * x * exp(-x/a[2])"
-        sdf_type = "ohmic"
-    elseif sdf_eq == "pi/2 * a[1] * x * a[2]^2 / ( x^2 + a[2]^2 )"
-        sdf_type = "debye"
-    else
-        sdf_type = "unknown"
-    end
-    # Directory name
-    dir_name =
-        "./runs/" *
-        sdf_type *
-        "/eps_$(ϵ)_Delta_$(Δ)" *
-        "/a_$(α)_T_$(T)/" *
-        Dates.format(now(), "yyyy-mm-dd_HH-MM-SS")
-    mkpath(dir_name)
-    println("Simulation results will be stored in $(dir_name)")
-    # Create and save the configuration file inside dir_name
-    config_file = dir_name * "/config.json"
+"Execute map tomography."
+function map_tomography(
+    sdf_filename,
+    ϵ,
+    Δ,
+    dt,
+    tau;
+    growMPSval = 10,
+    local_dim = 6,
+    tomoStates = ["Up", "Dn", "+", "i"]
+)
+    # Create directory to store data
+    dir = "./runs/" * Dates.format(now(), "yyyy-mm-dd_HH-MM-SS")
+    mkpath(dir)
+    # Create a configuration file with all the parameters
+    config_file = dir * "/config.json"
+    # - from sdf.json
+    input = open(sdf_filename)
+    s = read(input, String)
+    p = JSON.parse(s)
+    α, ωc = Float64.(p["environment"]["spectral_density_parameters"])
+    sdf_eq = String(p["environment"]["spectral_density_function"])
+    domain = Float64.(p["environment"]["domain"])
+    T = Float64(p["environment"]["temperature"])
+    chain_length = Int64(p["chain_length"])
+    tmax=Int(round(tau*π/Δ))
     save_config(
         config_file,
         α,
@@ -153,28 +115,25 @@ function makedir_simul(sdf_filename, ϵ, Δ, dt, tmax, growMPSval, local_dim)
         growMPSval,
         local_dim,
     )
-    return dir_name, config_file
-end
-
-"Evolve the states forming the tomographic basis."
-function evolve_tomographic_states(dir, sdf_filename, config_file)
-    config = load_config(config_file)
-    dt_step = config.dt
-    # Measurement step is equal to integration step
-    dt_meas = dt_step
-    # Compute TEDOPA coefficients
-    freqs_file, coups_file = tedopa_coefficients(dir, sdf_filename, config_file)
+    # Compute TEDOPA or T-TEDOPA coefficients according to temperature T
+    coefficients =
+        T == 0 ? TEDOPA.chainmapping_tedopa(sdf_filename) : TEDOPA.chainmapping_ttedopa(sdf_filename)
+    # Save coefficients into files
+    coeff_dir = dir * "/chain_coefficients"
+    mkpath(coeff_dir)
+    # Extract base filename without directory and extension
+    sdf_name = splitext(basename(sdf_filename))[1]
+    freqs_file, coups_file = save_tedopa_coefficients(coefficients, coeff_dir, sdf_name)
     # Evolve tomographic states
-    tomoStates = ["Up", "Dn", "+", "i"]
     for case in tomoStates
         # Define overall system initial state and overall hamiltonian
         (sysenv, psi0) = defineSystem(
             sys_type = "S=1/2",
             sys_istate = case,
-            chain_length = config.chain_length,
-            local_dim = config.local_dim,
+            chain_length = chain_length,
+            local_dim = local_dim,
         )
-        H = createMPO(sysenv, config.ϵ, config.Δ, "Sz", freqs_file, coups_file)
+        H = createMPO(sysenv, ϵ, Δ, "Sz", freqs_file, coups_file)
         # Measurements
         # - Sx, Sy, Sz on reduced system
         operators = [
@@ -182,16 +141,18 @@ function evolve_tomographic_states(dir, sdf_filename, config_file)
             LocalOperator(Dict(1 => "iSy")),
             LocalOperator(Dict(1 => "Sz")),
         ]
+        # Measurument time step is equal to integration time step
+        dt_meas = dt
         cb = ExpValueCallback(operators, sysenv, dt_meas)
         # Grow initial state MPS for tdvp1!
-        psi0ext = growMPS(psi0, config.growMPSval)[1]
+        psi0ext = growMPS(psi0, growMPSval)[1]
         # Run TDVP1
         tmpfile = tempname()
         tdvp1!(
             psi0ext,
             H,
-            dt_step,
-            config.tmax;
+            dt,
+            tmax;
             hermitian = true,
             normalize = false,
             callback = cb,
@@ -204,21 +165,4 @@ function evolve_tomographic_states(dir, sdf_filename, config_file)
         # Store results
         cp(tmpfile, dir * "/measurements_" * case * ".dat", force = true)
     end
-end
-
-"Execute map tomography."
-function map_tomography(
-    sdf_filename,
-    ϵ,
-    Δ;
-    dt = 0.01,
-    tmax = 30,
-    growMPSval = 10,
-    local_dim = 6,
-)
-    # Create directory to store data of map tomography, add config file
-    dir_name, config_file =
-        makedir_simul(sdf_filename, ϵ, Δ, dt, tmax, growMPSval, local_dim)
-    # Evolve tomographic states
-    evolve_tomographic_states(dir_name, sdf_filename, config_file)
 end

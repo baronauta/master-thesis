@@ -5,15 +5,23 @@ Pkg.activate("./MyPackage")
 using MyPackage
 
 # Define sdf parameters
-sdf_folder = "sdf-ohmic"
-sdf_type = "ohmic"
-a = 0.1
+sdf_type = "debye"
+a = 0.3
 T = 0.0
-sdf = "./sdf/$(sdf_folder)/$(sdf_type)_a_" * string(a) * "_T_" * string(T) * ".json"
+hc = 20
+sdf = "./sdf/$(sdf_type)/$(sdf_type)_a_" * string(a) * "_T_" * string(T) * "_hc_" * string(hc) * ".json"
 # Define TLS parameters
 ϵ = 0.0
 Δ = 0.2
 
 # Run map_tomography
-my_dt = 0.005
-map_tomography(sdf, ϵ, Δ; dt = my_dt, tmax = 30, growMPSval = 10, local_dim = 6)
+dt = 0.005
+tau = 1
+tomo = ["Up", "Dn", "+", "i"]
+# tomo = ["Up"]
+# tomo = ["Dn"]
+# tomo = ["+"]
+# tomo = ["i"] 
+bd = 10
+ld = 6
+map_tomography(sdf, ϵ, Δ, dt, tau; growMPSval = bd, local_dim = ld, tomoStates = tomo)
