@@ -19,6 +19,6 @@ export chain_coefficients, tomodynamics, envdynamics, get_measurements
 include("simulation.jl")
 
 export computeKs
-include("thermodynamics.jl")
+include("dynamics.jl")
 
 end
