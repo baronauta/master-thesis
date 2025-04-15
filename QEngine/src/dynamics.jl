@@ -92,6 +92,12 @@ function krausdecomposition(gen::Matrix{ComplexF64})
     return eigvals, krausoperators
 end
 
+# ─────────────────────────────────────────────────────────────
+# Thermodynamics quantities
+# - Effective Hamiltonian Ks
+# - Internal energy Us(t) = Tr[Ks(t)ρs(t)]
+# ─────────────────────────────────────────────────────────────
+
 function computeKs(eigvals::Vector{Float64}, E::Vector{Matrix{ComplexF64}})
     total =
         sum([eigvals[k] * (tr(E[k]) * E[k]' - tr(E[k]') * E[k]) for k = 1:length(eigvals)])
@@ -141,6 +147,82 @@ end
 # end
 
 
-# function internal_energy(Ks, rho)
-#     return real(tr.(Ks .* rho[2:end])) # Ks(t=0) not defined
-# end
+function internal_energy(Ks, rho)
+    return real(tr.(Ks .* rho[2:end])) # Ks(t=0) not defined
+end
+
+
+# ─────────────────────────────────────────────────────────────
+# Environment
+# - Occupation number of the chain modes
+# - Occupation number of the normal modes
+# ─────────────────────────────────────────────────────────────
+
+function chain_occupation(dirdata::String) 
+    meas = get_measurements(dirdata * "/measurements_N.dat", "N")
+    # MPS of sys⊗env: environment sites from {2} to {NN+1}
+    # with NN number of chain sites.
+    # Measurments performed for each sites for each time in meas.time:
+    # collect result into `data`.
+    NN = length(meas.result)
+    data = [
+        [meas.result["N{$i}_re"][t] for i in 2:NN+1]
+        for t in 1:length(meas.time)
+    ]
+    sites = 1:NN
+    return ( ns = data, sites = sites, time = meas.time )
+end
+
+function _normalmodes(filename::String)
+    # Chain Hamiltonian for the env is H_E = c† A c, where A is a tridiagonal matrix:
+    # major diagonal formed by frequencies ωn (n = 0...N-1),
+    # sub-diagonal and super-diagonal formed by couplings κn (n = 1...N-1).
+    coeff = chain_coefficients(filename)
+    f = coeff.frequencies
+    # Couplings κn with n = 0...N-1. But κ0, the one for the TLS-env interaction,
+    # must be excluded because it doesn't belong with H_E.
+    # Thus, I consider κn with n = 1...N-1.
+    k = coeff.couplings[2:end]
+    A = Tridiagonal(k, f, k)
+
+    # Diagonalize A.
+    # Any Hermitian matrix can be diagonalized by a unitary matrix.
+    # A = U† D U, with D diagonal matrix and U unitary matrix. Let P = U†.
+    # Eigensolver:
+    # E.values contains the eigenvalues (diagonal entries of D);
+    # E.vectors contains the eigenvectors (columns of P).
+    E = eigen(A)
+    D = Diagonal(E.values)
+    P = E.vectors
+    return D, P
+end
+
+function envmodes_occupation(dirdata::String)
+    meas = get_measurements(dirdata * "/measurements_N.dat", "N")
+    # Compute chain coefficients and find normal modes
+    D, P = _normalmodes(dirdata * "/config.json")
+    modes = diag(D)
+    # MPS of sys⊗env: environment sites from {2} to {NN+1}
+    # with NN number of chain sites.
+    NN = length(meas.result)
+    # Measurments performed for each sites for each time in meas.time:
+    # collect result into `data`.
+    # Let b{i} be the environment modes, occupation number is known, 
+    # i.e <b†{i}b{i}> = meas["N{i}_re"].
+    # The chain Hamiltonian of the environment is quadratic in b{i} 
+    # with matrix A being tridiagonal, i.e H_E = (b†{i})_i A (b{i})_i.
+    # Diagonalize A: 
+    # A = PDP^(-1); equivalent notation A = U†DU with U†:=P.
+    # Normal modes decomposition of H_E is obtained defining
+    # (t{i})_i:= U(b{i})_i. Thus, H_E = (t†{i})_i D (t{i})_i. 
+    # Occupation number: 
+    # <t†{i}t{i}> = ∑j P[i-1,j-1]^2 * <b†{j}b{j}>.
+    # Modes numbering is i = 2...NN+1, P is a square matrix with indexes 1...NN
+    data = [
+        [sum(P[j-1, i-1]^2 * meas.result["N{$j}_re"][t] for j in 2:NN+1)
+        for i in 2:NN+1]
+        for t in 1:length(meas.time)
+    ]
+   
+    return ( ns = data, modes = modes, time = meas.time )
+end

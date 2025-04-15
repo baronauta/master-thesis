@@ -18,7 +18,7 @@ include("setup.jl")
 export chain_coefficients, tomodynamics, envdynamics, get_measurements
 include("simulation.jl")
 
-export computeKs
+export computeKs, chain_occupation, envmodes_occupation
 include("dynamics.jl")
 
 end
