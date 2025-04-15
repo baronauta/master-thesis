@@ -1,0 +1,17 @@
+name = "QPlot"
+uuid = "a835ba6d-b38e-4687-a2f1-7057b48d38c4"
+authors = ["Andrea Baroffio <andrea.baroff2000@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+QEngine = "f66af78e-48dd-4103-8082-d688d88f5a14"
+
+[compat]
+CairoMakie = "0.13.4"
+GLMakie = "0.11.5"
+JSON = "0.21.4"
+LinearAlgebra = "1.11.0"
