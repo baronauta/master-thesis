@@ -9,8 +9,9 @@ function _scalets(ts, Delta)
 end
 
 "Shorten time domain for plots."
-function _timefilter!(ts, ys, tmax)
-    ts[ts.<=tmax], ys[ts.<=tmax]
+function _timefilter(ts, ys, tmax)
+    mask = ts .<= tmax
+    return ts[mask], ys[mask]
 end
 
 # ─────────────────────────────────────────────────────────────
@@ -138,8 +139,10 @@ function plot_Ks(dirdata::String, row_idx, col_idx; tmax = nothing)
 
     if tmax !== nothing
         # Shorten time domain
-        ts, ReKs = _timefilter!(ts, ReKs, tmax)
-        _, ImKs = _timefilter!(ts, ImKs, tmax)
+        mask = ts .<= tmax
+        ts = ts[mask]
+        ReKs = ReKs[mask]
+        ImKs = ImKs[mask]
     end
 
     f = Figure()
@@ -149,7 +152,7 @@ function plot_Ks(dirdata::String, row_idx, col_idx; tmax = nothing)
         xlabel = L"t \Delta / \pi",
         ylabel = L"\text{Re}(K_{%$(row_idx)%$(col_idx)})",
     )
-    lines!(ax1, ts, ReKs, label = L"\alpha=%$(config.a[1]),\,T=%$(config.temperature)")
+    lines!(ax1, ts, ReKs, label = L"\text{Ohmic}:\,\alpha=%$(config.a[1]),\,T=%$(config.temperature)")
     axislegend(position = :rt)
     # Imaginary part of Ks
     ax2 = Axis(
@@ -157,7 +160,7 @@ function plot_Ks(dirdata::String, row_idx, col_idx; tmax = nothing)
         xlabel = L"t \Delta / \pi",
         ylabel = L"\text{Im}(K_{%$(row_idx)%$(col_idx)})",
     )
-    lines!(ax2, ts, ImKs, label = L"\alpha=%$(config.a[1]),\,T=%$(config.temperature)")
+    lines!(ax2, ts, ImKs, label = L"\text{Ohmic}:\,\alpha=%$(config.a[1]),\,T=%$(config.temperature)")
     axislegend(position = :rt)
 
     f
@@ -190,89 +193,47 @@ end
 
 # ─────────────────────────────────────────────────────────────
 # Environment
-# - Occupation number of the chain modes
+# - Occupation number of the chain sites
 # - Occupation number of the normal modes
 # ─────────────────────────────────────────────────────────────
 
 function plot_chain_occupation(dirdata::String, t_idx::Integer)
-    meas = get_measurements(dirdata * "/measurements_N.dat", "N")
-
-    # time scaled by Δ / π
+    data = chain_occupation(dirdata)
+    sites = data.sites
+    ns = data.ns
+    # Time scaled by Δ / π (for labels)
+    ts = data.time
     config = loadconfig(dirdata * "/config.json")
-    ts_scaled = _scalets(meas.time, config.Delta)
-    # Choose time according to t_idx
-    t = round(ts_scaled[t_idx], digits = 2)
-
-    # MPS of sys ⊗ env has site {1} occupied by TLS, sites from {2} to {NN+1} are the ones of the env
-    # NN is the number of chain sites in the environment
-    ns = Vector([])
-    NN = length(meas.result)
-    for i = 2:NN+1
-        push!(ns, meas.result["N{$i}_re"][t_idx])
-    end
+    labels = round.(_scalets(ts, config.Delta), digits=3)
+    # Consider time indexed by t_idx
+    xs = sites[t_idx]
+    ys = ns[t_idx]
+    l = labels[t_idx]
 
     f = Figure()
     ax = Axis(f[1, 1], xlabel = L"i,\,\text{chain sites}", ylabel = L"\langle n_i \rangle")
-    lines!(ax, (1:NN), ns, label = L"t\Delta / \pi = %$(t)")
+    lines!(ax, xs, ys, label = L"t\Delta / \pi = %$(l)")
     axislegend(position = :rt)
 
     f
 end
 
-function _normalmodes(filename::String)
-    # Chain Hamiltonian for the env is H_E = c† A c, where A is a tridiagonal matrix:
-    # major diagonal formed by frequencies ωn (n = 0...N-1),
-    # sub-diagonal and super-diagonal formed by couplings κn (n = 1...N-1).
-    coeff = chain_coefficients(filename)
-    f = coeff.frequencies
-    # Couplings κn with n = 0...N-1. But κ0, the one for the TLS-env interaction,
-    # must be excluded because it doesn't belong with H_E.
-    # Thus, I consider κn with n = 1...N-1
-    k = coeff.couplings[2:end]
-    A = Tridiagonal(k, f, k)
-
-    # Diagonalize A
-    # Any Hermitian matrix can be diagonalized by a unitary matrix.
-    # A = U† D U, with D diagonal matrix and U unitary matrix. Let P = U†
-    # Eigensolver
-    # E.values contains the eigenvalues (diagonal entries of D)
-    # E.vectors contains the eigenvectors (columns of P)
-    E = eigen(A)
-    D = Diagonal(E.values)
-    P = E.vectors
-    return D, P
-end
-
 function plot_envmodes_occupation(dirdata::String, t_idx::Integer)
-    meas = get_measurements(dirdata * "/measurements_N.dat", "N")
-
-    # time scaled by Δ / π
+    data = chain_occupation(dirdata)
+    modes = data.modes
+    ns = data.ns
+    # Time scaled by Δ / π (for labels)
+    ts = data.time
     config = loadconfig(dirdata * "/config.json")
-    ts_scaled = _scalets(meas.time, config.Delta)
-    # Choose time according to t_idx
-    t = round(ts_scaled[t_idx], digits = 2)
-
-    # Compute chain coefficients and find normal modes
-    D, P = _normalmodes(dirdata * "/config.json")
-    # MPS of sys⊗env has site {1} occupied by TLS, sites from {2} to {NN+1} are the ones of the env
-    # NN is the number of chain sites in the environment
-    ns = Vector([])
-    NN = length(meas.result)
-    # Let b{i} be the environment modes, occupation number is known, i.e <b†{i}b{i}> = meas["N{i}_re"].
-    # The chain Hamiltonian of the environment is quadratic in b{i} with matrix A being tridiagonal,
-    # that is H_E = (b†{i})_i A (b{i})_i.
-    # Diagonalize A: A = PDP^(-1); equivalent notation A = U†DU with U†:=P.
-    # Normal modes decomposition of H_E is obtained definind (t{i})_i:= U(b{i})_i: H_E = (t†{i})_i D (t{i})_i. 
-    # Occupation number: <t†{i}t{i}> = ∑j P[i-1,j-1]^2 * <b†{j}b{j}>.
-    # Modes numbering is i = 2...NN+1, P is a square matrix with indexes 1...NN
-    for i = 2:NN+1
-        val = sum(P[j-1, i-1]^2 * meas.result["N{$(j)}_re"][t_idx] for j = 2:NN+1)
-        push!(ns, val)
-    end
+    labels = round.(_scalets(ts, config.Delta), digits=3)
+    # Consider time indexed by t_idx
+    xs = modes[t_idx]
+    ys = ns[t_idx]
+    l = labels[t_idx]
 
     f = Figure()
     ax = Axis(f[1, 1], xlabel = L"\omega", ylabel = L"\langle n_\omega \rangle")
-    lines!(ax, diag(D), ns, label = L"t\Delta / \pi = %$(t)")
+    lines!(ax, xs, ys, label = L"t\Delta / \pi = %$(l)")
     axislegend(position = :rt)
 
     f
