@@ -9,4 +9,7 @@ using QEngine
 include("sdf.jl")
 include("figs.jl")
 
+export animate_chain_occupation, animate_envmodes_occupation
+include("animate.jl")
+
 end
