@@ -1,5 +1,5 @@
 "For my checks."
-function sdf_constant(; alpha=0.1, epsilon=0.5, Delta=0.2, omegac=1, s=1)
+function sdf_constant(; alpha = 0.1, epsilon = 0.5, Delta = 0.2, omegac = 1, s = 1)
     omegas = 2 * sqrt(epsilon^2 + Delta^2)
     π / 2 * alpha / (omegas^s * omegac^(s - 1))
 end
@@ -82,7 +82,9 @@ function _input_spectral_density(epsilon, Delta)
         sdf, a = _handle_predefined_ohmic(epsilon, Delta)
     else
         println("→ Using custom spectral density function:\n  $sdf")
-        print("Enter spectral density parameters as comma-separated values (e.g., 0.1,1.0,...): ")
+        print(
+            "Enter spectral density parameters as comma-separated values (e.g., 0.1,1.0,...): ",
+        )
         a = parse.(Float64, split(readline(), ","))
     end
     return sdf, a
@@ -92,7 +94,9 @@ function _handle_predefined_ohmic(epsilon, Delta)
     sdf = "pi/2 * a[1] * x^(a[3]) / a[2]^(a[3]-1) * exp(-x/a[2])"
     println("→ Using predefined ohmic spectral density:")
     println("  $sdf\n  a[1] (α), a[2] (ωc), a[3] (s)")
-    print("Enter the spectral density parameters as comma-separated values (e.g. 0.1,1.0,1.0): ")
+    print(
+        "Enter the spectral density parameters as comma-separated values (e.g. 0.1,1.0,1.0): ",
+    )
     a = parse.(Float64, split(readline(), ","))
     println("Possible rescaling: α → α / (ωs)^s. Dou want to apply? [Y/N]")
     scale = readline()
@@ -186,7 +190,7 @@ function _suggest_params(parameters::Dict{<:AbstractString,Any})
     # - N = 2 * k∞ * tmax
 
     # Suggested time step (dt)
-    dt = round(1 / (k∞ * 50), sigdigits=1, base=10)
+    dt = round(1 / (k∞ * 50), sigdigits = 1, base = 10)
 
     # Maximum simulation time in seconds unit
     Delta = parameters["TLS"]["Delta"]
@@ -208,16 +212,16 @@ function loadconfig(filename::String)
     config = JSON.parsefile(filename)
 
     return (
-        epsilon=config["TLS"]["epsilon"],
-        Delta=config["TLS"]["Delta"],
-        dt=config["simulation"]["dt"],
-        t_Delta_over_pi=config["simulation"]["t_Delta_over_pi"],
-        grow_mps=config["simulation"]["grow_mps"],
-        local_dim=config["simulation"]["local_dim"],
-        domain=config["environment"]["domain"],
-        a=config["environment"]["spectral_density_parameters"],
-        sdf=config["environment"]["spectral_density_function"],
-        temperature=config["environment"]["temperature"],
-        chain_length=config["chain_length"],
+        epsilon = config["TLS"]["epsilon"],
+        Delta = config["TLS"]["Delta"],
+        dt = config["simulation"]["dt"],
+        t_Delta_over_pi = config["simulation"]["t_Delta_over_pi"],
+        grow_mps = config["simulation"]["grow_mps"],
+        local_dim = config["simulation"]["local_dim"],
+        domain = config["environment"]["domain"],
+        a = config["environment"]["spectral_density_parameters"],
+        sdf = config["environment"]["spectral_density_function"],
+        temperature = config["environment"]["temperature"],
+        chain_length = config["chain_length"],
     )
 end

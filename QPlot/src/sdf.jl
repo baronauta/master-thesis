@@ -1,25 +1,20 @@
-function plot_sdf(sdf_filename::String)
-    input = open(sdf_filename)
-    s = read(input, String)
-    p = JSON.parse(s)
+function sdf(filename::String)
+    p = open(filename) do input
+        JSON.parse(read(input, String))
+    end
     a = Float64.(p["environment"]["spectral_density_parameters"])
     support = Float64.(p["environment"]["domain"])
     fn = p["environment"]["spectral_density_function"]
     # Creating a callable function object tmp
     tmp = eval(Meta.parse("(a, x) -> " * fn))
-    sdf = x -> Base.invokelatest(tmp, a, x)
+    f = x -> Base.invokelatest(tmp, a, x)
     xs = collect(range(support..., 1000))
-    ys = sdf.(xs)
-    # Create and display the plot
-    f = Figure()
-    ax = Axis(f[1, 1], xlabel = L"\omega", ylabel = L"J(\omega)")
-    lines!(ax, xs, ys, label = L"\alpha=%$(a[1])")
-    axislegend(position = :rt)
-    f
+    ys = f.(xs)
+    return xs, ys
 end
 
-function plot_extended_sdf(sdf_filename::String)
-    p = open(sdf_filename) do input
+function thermal_sdf(filename::String)
+    p = open(filename) do input
         JSON.parse(read(input, String))
     end
     a = Float64.(p["environment"]["spectral_density_parameters"])
@@ -33,21 +28,35 @@ function plot_extended_sdf(sdf_filename::String)
     fn = p["environment"]["spectral_density_function"]
     # Creating a callable function object tmp
     tmp = eval(Meta.parse("(a, x) -> " * fn))
-    sdf = x -> Base.invokelatest(tmp, a, x)
+    f = x -> Base.invokelatest(tmp, a, x)
     # Defining the extended function
-    extended_sdf = x -> (x > 0 ? sdf(x) : -sdf(-x)) * (1 / 2) * (1 + coth(x / (T * 2.0)))
+    thermal_f = x -> (1 / 2) * (1 + coth(0.5 * x / T)) * sign(x) * f(abs(x))
     xs = collect(range(extended_support..., 1000))
-    ys = extended_sdf.(xs)
+    ys = thermal_f.(xs)
+    return xs, ys, T
+end
+
+function plot_sdf(filename::String)
+    xs, ys = sdf(filename)
+    # Create and display the plot
+    f = Figure()
+    ax = Axis(f[1, 1], xlabel = L"\omega", ylabel = L"J(\omega)")
+    lines!(ax, xs, ys)
+    f
+end
+
+function plot_thermal_sdf(filename::String)
+    xs, ys, temp = thermal_sdf(filename)
     # Create and display the plot
     f = Figure()
     ax = Axis(f[1, 1], xlabel = L"\omega", ylabel = L"J_\beta(\omega)")
-    lines!(ax, xs, ys, label = L"\alpha=%$(a[1]),\,T=%$(T)")
+    lines!(ax, xs, ys, label = L"T=%$(temp)")
     axislegend(position = :rt)
     f
 end
 
-function plot_chain_coefficients(sdf_filename::String)
-    coefficients = chain_coefficients(sdf_filename)
+function plot_chain_coefficients(filename::String)
+    coefficients = chain_coefficients(filename)
     f = Figure()
     ax = Axis(f[1, 1], xlabel = L"n", ylabel = "Chain coefficients")
     lines!(

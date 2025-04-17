@@ -152,7 +152,12 @@ function plot_Ks(dirdata::String, row_idx, col_idx; tmax = nothing)
         xlabel = L"t \Delta / \pi",
         ylabel = L"\text{Re}(K_{%$(row_idx)%$(col_idx)})",
     )
-    lines!(ax1, ts, ReKs, label = L"\text{Ohmic}:\,\alpha=%$(config.a[1]),\,T=%$(config.temperature)")
+    lines!(
+        ax1,
+        ts,
+        ReKs,
+        label = L"\text{Ohmic}:\,\alpha=%$(config.a[1]),\,T=%$(config.temperature)",
+    )
     axislegend(position = :rt)
     # Imaginary part of Ks
     ax2 = Axis(
@@ -160,7 +165,12 @@ function plot_Ks(dirdata::String, row_idx, col_idx; tmax = nothing)
         xlabel = L"t \Delta / \pi",
         ylabel = L"\text{Im}(K_{%$(row_idx)%$(col_idx)})",
     )
-    lines!(ax2, ts, ImKs, label = L"\text{Ohmic}:\,\alpha=%$(config.a[1]),\,T=%$(config.temperature)")
+    lines!(
+        ax2,
+        ts,
+        ImKs,
+        label = L"\text{Ohmic}:\,\alpha=%$(config.a[1]),\,T=%$(config.temperature)",
+    )
     axislegend(position = :rt)
 
     f
@@ -204,7 +214,7 @@ function plot_chain_occupation(dirdata::String, t_idx::Integer)
     # Time scaled by Δ / π (for labels)
     ts = data.time
     config = loadconfig(dirdata * "/config.json")
-    labels = round.(_scalets(ts, config.Delta), digits=3)
+    labels = round.(_scalets(ts, config.Delta), digits = 3)
     # Consider time indexed by t_idx
     xs = sites[t_idx]
     ys = ns[t_idx]
@@ -225,7 +235,7 @@ function plot_envmodes_occupation(dirdata::String, t_idx::Integer)
     # Time scaled by Δ / π (for labels)
     ts = data.time
     config = loadconfig(dirdata * "/config.json")
-    labels = round.(_scalets(ts, config.Delta), digits=3)
+    labels = round.(_scalets(ts, config.Delta), digits = 3)
     # Consider time indexed by t_idx
     xs = modes[t_idx]
     ys = ns[t_idx]

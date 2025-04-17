@@ -158,19 +158,16 @@ end
 # - Occupation number of the normal modes
 # ─────────────────────────────────────────────────────────────
 
-function chain_occupation(dirdata::String) 
+function chain_occupation(dirdata::String)
     meas = get_measurements(dirdata * "/measurements_N.dat", "N")
     # MPS of sys⊗env: environment sites from {2} to {NN+1}
     # with NN number of chain sites.
     # Measurments performed for each sites for each time in meas.time:
     # collect result into `data`.
     NN = length(meas.result)
-    data = [
-        [meas.result["N{$i}_re"][t] for i in 2:NN+1]
-        for t in 1:length(meas.time)
-    ]
+    data = [[meas.result["N{$i}_re"][t] for i = 2:NN+1] for t = 1:length(meas.time)]
     sites = 1:NN
-    return ( ns = data, sites = sites, time = meas.time )
+    return (ns = data, sites = sites, time = meas.time)
 end
 
 function _normalmodes(filename::String)
@@ -219,10 +216,9 @@ function envmodes_occupation(dirdata::String)
     # <t†{i}t{i}> = ∑j P[i-1,j-1]^2 * <b†{j}b{j}>.
     # Modes numbering is i = 2...NN+1, P is a square matrix with indexes 1...NN
     data = [
-        [sum(P[j-1, i-1]^2 * meas.result["N{$j}_re"][t] for j in 2:NN+1)
-        for i in 2:NN+1]
-        for t in 1:length(meas.time)
+        [sum(P[j-1, i-1]^2 * meas.result["N{$j}_re"][t] for j = 2:NN+1) for i = 2:NN+1]
+        for t = 1:length(meas.time)
     ]
-   
-    return ( ns = data, modes = modes, time = meas.time )
+
+    return (ns = data, modes = modes, time = meas.time)
 end
