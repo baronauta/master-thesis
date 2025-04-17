@@ -176,6 +176,31 @@ function plot_Ks(dirdata::String, row_idx, col_idx; tmax = nothing)
     f
 end
 
+function plot_eigvals(dirdata::String)
+    effective_hamiltonian = computeKs(dirdata::String)
+    # xs: time scaled by Δ / π
+    config = loadconfig(dirdata * "/config.json")
+    ts = _scalets(effective_hamiltonian.time, config.Delta)
+    # Ks eigenvalues
+    Ks = effective_hamiltonian.Ks
+    E = eigen.(Ks)
+    eigvals_Ks_minus = [eig.values[1] for eig in E]
+    eigvals_Ks_plus = [eig.values[2] for eig in E]
+    # Hs eigenvalues
+    eigvals_Hs = 2 * sqrt(config.epsilon^2 + config.Delta^2)
+    f = Figure()
+
+    ax = Axis(f[1, 1], xlabel = L"t \Delta / \pi")
+    # Ks eigenvalues
+    lines!(ax, ts, eigvals_Ks_minus, color = :green, label = L"\text{eigs}(K_s)")
+    lines!(ax, ts, eigvals_Ks_plus, color = :green)
+    # Hs eigenvalues
+    hlines!(ax, eigvals_Hs, color = :purple, label = L"\text{eigs}(H_s)")
+    hlines!(ax, -eigvals_Hs, color = :purple)
+    axislegend(position = :rt)
+
+    f
+end
 
 
 # "Plot internal energy."
