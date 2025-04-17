@@ -18,85 +18,17 @@ Prompts:
 The configuration is saved to `runs/<dirname>/config.json`.
 """
 function setup(dirname::String)
-    println("=== SPECTRAL DENSITY FUNCTION SETUP ===")
-    println("You can enter a custom expression, e.g. pi/2 * a[1] * x * exp(-x/a[2]).")
-    println(
-        "Note: 'a' is a parameter array that you will be asked to provide in the next step.",
-    )
-    println("Or use a predefined model by name: ohmic, superohmic, subohmic.")
-    print("Enter spectral density function: ")
-    sdf = readline()
-
-    if sdf == "ohmic"
-        sdf = "pi/2* a[1] * x * exp(-x/a[2])"
-        println("→ Using predefined Ohmic spectral density:")
-        println("  $sdf")
-        println("Now enter the spectral density parameters as comma-separated values:")
-        println("  a[1] (α): Coupling strength")
-        println("  a[2] (ωc): Cut-off frequency")
-        print("Enter values (e.g., 0.1,1.0): ")
-        a_str = readline()
-        a = parse.(Float64, split(a_str, ","))
-    elseif sdf == "superohmic"
-        sdf = "pi/2 * a[1] * x^(a[3]) / a[2]^(a[3]-1) * exp(-x/a[2])"
-        println("→ Using predefined Super-Ohmic spectral density:")
-        println("  $sdf")
-        println("Now enter the spectral density parameters as comma-separated values:")
-        println("  a[1] (α): Coupling strength")
-        println("  a[2] (ωc): Cut-off frequency")
-        println("  a[3] (s): Spectral type — s>1 (Super-Ohmic)")
-        print("Enter values (e.g., 0.1,1.0,1.2): ")
-        a_str = readline()
-        a = parse.(Float64, split(a_str, ","))
-    elseif sdf == "subohmic"
-        sdf = "pi/2 * a[1] * x^(a[3]) / a[2]^(a[3]-1) * exp(-x/a[2])"
-        println("→ Using predefined Super-Ohmic spectral density:")
-        println("  $sdf")
-        println("Now enter the spectral density parameters as comma-separated values:")
-        println("  a[1] (α): Coupling strength")
-        println("  a[2] (ωc): Cut-off frequency")
-        println("  a[3] (s): Spectral type — s<1 (Sub-Ohmic)")
-        print("Enter values (e.g., 0.1,1.0,0.4): ")
-        a_str = readline()
-        a = parse.(Float64, split(a_str, ","))
-    else
-        println("→ Using custom spectral density function:")
-        println("  $sdf")
-    end
-
-    print("Enter spectral domain maximum as an integer [0,max] (e.g. 10): ")
-    domain_str = readline()
-    domain_max = parse(Int, domain_str)
-    domain = [0, domain_max]
-
-    print("Enter environment temperature: ")
-    temp = parse(Float64, readline())
-
-    print("Enter environment chain length: ")
-    chain_length = parse(Int, readline())
-
-    # Default value
-    PolyChaos_nquad = 5000
-
     println("\n=== TWO-LEVEL SYSTEM SETUP ===")
-    println("The system Hamiltonian is: H = ϵσz + Δσx")
-    print("Enter ϵ (bias): ")
-    epsilon = parse(Float64, readline())
-    print("Enter Δ (tunneling amplitude): ")
-    Delta = parse(Float64, readline())
+    epsilon, Delta = _input_tls_parameters()
+
+    println("\n=== SPECTRAL DENSITY FUNCTION SETUP ===")
+    sdf, a = _input_spectral_density(epsilon, Delta)
+
+    println("\n=== ENVIRONMENT SETUP ===")
+    domain, temp, chain_length = _input_environment()
 
     println("\n=== SIMULATION SETTINGS ===")
-    print("Enter time step dt: ")
-    dt = parse(Float64, readline())
-
-    print("Enter total simulation time (in units of tΔ/π): ")
-    t_Delta = parse(Float64, readline())
-
-    print("Enter local Hilbert space dimension per environment site: ")
-    local_dim = parse(Int, readline())
-
-    print("Enter MPS bond dimension growth: ")
-    grow_mps = parse(Int, readline())
+    t_Delta, local_dim, grow_mps = _input_simulation_settings()
 
     data = Dict(
         "environment" => Dict(
@@ -106,39 +38,130 @@ function setup(dirname::String)
             "temperature" => temp,
         ),
         "chain_length" => chain_length,
-        "PolyChaos_nquad" => PolyChaos_nquad,
+        "PolyChaos_nquad" => 5000,
         "TLS" => Dict("epsilon" => epsilon, "Delta" => Delta),
         "simulation" => Dict(
-            "dt" => dt,
+            "dt" => nothing,
             "local_dim" => local_dim,
             "t_Delta_over_pi" => t_Delta,
             "grow_mps" => grow_mps,
         ),
     )
 
+    # Parameter suggestions
+    _apply_suggestions!(data)
+
+    _save_config(dirname, data)
+end
+
+function _input_tls_parameters()
+    println("The system Hamiltonian is: H = ϵσz + Δσx")
+    print("Enter ϵ (bias): ")
+    epsilon = parse(Float64, readline())
+    print("Enter Δ (tunneling amplitude): ")
+    Delta = parse(Float64, readline())
+    return epsilon, Delta
+end
+
+function _input_spectral_density(epsilon, Delta)
+    println("You can enter a custom expression, e.g. pi/2 * a[1] * x * exp(-x/a[2]).")
+    println(
+        "Note: 'a' is a parameter array that you will be asked to provide in the next step.",
+    )
+    println("Or use a predefined model by name: ohmic.")
+    print("Enter spectral density function: ")
+    sdf = readline()
+
+    if sdf == "ohmic"
+        sdf, a = _handle_predefined_ohmic(epsilon, Delta)
+    else
+        println("→ Using custom spectral density function:\n  $sdf")
+        print("Enter spectral density parameters as comma-separated values (e.g., 0.1,1.0,...): ")
+        a = parse.(Float64, split(readline(), ","))
+    end
+    return sdf, a
+end
+
+function _handle_predefined_ohmic(epsilon, Delta)
+    sdf = "pi/2 * a[1] * x^(a[3]) / a[2]^(a[3]-1) * exp(-x/a[2])"
+    println("→ Using predefined ohmic spectral density:")
+    println("  $sdf\n  a[1] (α), a[2] (ωc), a[3] (s)")
+    print("Enter the spectral density parameters as comma-separated values (e.g. 0.1,1.0,1.0): ")
+    a = parse.(Float64, split(readline(), ","))
+    println("Possible rescaling: α → α / (ωs)^s. Dou want to apply? [Y/N]")
+    scale = readline()
+    if scale == "Y"
+        # Rescaling of α with the frequency value of the system.
+        # For the considered TLS: ωs = (E+ - E-)/ħ, 
+        # where E± eigvals of Hs, is 2√(ϵ^2+Δ^2).
+        ωs = 2 * sqrt(epsilon^2 + Delta^2)
+        a[1] /= ωs^a[3]
+        println("→ Rescaling applied.")
+    elseif scale == "N"
+        println("→ No rescaling.")
+    else
+        println("ERROR: invalid input!")
+    end
+
+    return sdf, a
+end
+
+function _input_environment()
+    print("Enter spectral domain maximum as an integer [0,max] (e.g. 10): ")
+    domain_max = parse(Int, readline())
+    domain = [0, domain_max]
+
+    print("Enter environment temperature: ")
+    temp = parse(Float64, readline())
+
+    print("Enter environment chain length: ")
+    chain_length = parse(Int, readline())
+
+    return domain, temp, chain_length
+end
+
+function _input_simulation_settings()
+    print("Enter total simulation time (in units of tΔ/π): ")
+    t_Delta = parse(Float64, readline())
+
+    print("Enter local Hilbert space dimension per environment site: ")
+    local_dim = parse(Int, readline())
+
+    print("Enter MPS bond dimension growth: ")
+    grow_mps = parse(Int, readline())
+
+    return t_Delta, local_dim, grow_mps
+end
+
+function _apply_suggestions!(data)
     suggested_dt, suggested_N = _suggest_params(data)
+
     println("\n=== PARAMETER SUGGESTIONS ===")
     println("Based on your input, we suggest:")
-    println("  Time step    dt  = $suggested_dt")
     println("  Chain length  N  = $suggested_N")
+    println("  Time step    dt  = $suggested_dt")
     print("Do you want to apply these suggestions? [Y/N]: ")
+
     change = readline()
     if change == "Y"
         data["simulation"]["dt"] = suggested_dt
         data["chain_length"] = suggested_N
         println("→ Suggestions applied.")
+    elseif change == "N"
+        println("→ Keeping original chain length N.")
+        print("Enter time step dt: ")
+        data["simulation"]["dt"] = parse(Float64, readline())
     else
-        println("→ Keeping original parameters.")
+        println("ERROR: invalid input!")
     end
+end
 
-    mkdir("runs")
-    newdir = "runs/" * dirname
-    mkdir(newdir)
-    filename = newdir * "/config.json"
+function _save_config(dirname::String, data::Dict)
+    mkpath("runs/$dirname")
+    filename = "runs/$dirname/config.json"
     open(filename, "w") do f
         write(f, JSON.json(data, 4))
     end
-
     println("\nConfiguration saved to '$filename'")
 end
 
@@ -157,7 +180,7 @@ function _suggest_params(parameters::Dict{<:AbstractString,Any})
     # - N = 2 * k∞ * tmax
 
     # Suggested time step (dt)
-    dt = round(1 / (k∞ * 50), sigdigits = 1, base = 10)
+    dt = round(1 / (k∞ * 50), sigdigits=1, base=10)
 
     # Maximum simulation time in seconds unit
     Delta = parameters["TLS"]["Delta"]
@@ -179,16 +202,16 @@ function loadconfig(filename::String)
     config = JSON.parsefile(filename)
 
     return (
-        epsilon = config["TLS"]["epsilon"],
-        Delta = config["TLS"]["Delta"],
-        dt = config["simulation"]["dt"],
-        t_Delta_over_pi = config["simulation"]["t_Delta_over_pi"],
-        grow_mps = config["simulation"]["grow_mps"],
-        local_dim = config["simulation"]["local_dim"],
-        domain = config["environment"]["domain"],
-        a = config["environment"]["spectral_density_parameters"],
-        sdf = config["environment"]["spectral_density_function"],
-        temperature = config["environment"]["temperature"],
-        chain_length = config["chain_length"],
+        epsilon=config["TLS"]["epsilon"],
+        Delta=config["TLS"]["Delta"],
+        dt=config["simulation"]["dt"],
+        t_Delta_over_pi=config["simulation"]["t_Delta_over_pi"],
+        grow_mps=config["simulation"]["grow_mps"],
+        local_dim=config["simulation"]["local_dim"],
+        domain=config["environment"]["domain"],
+        a=config["environment"]["spectral_density_parameters"],
+        sdf=config["environment"]["spectral_density_function"],
+        temperature=config["environment"]["temperature"],
+        chain_length=config["chain_length"],
     )
 end
