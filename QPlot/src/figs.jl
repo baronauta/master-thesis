@@ -152,12 +152,7 @@ function plot_Ks(dirdata::String, row_idx, col_idx; tmax = nothing)
         xlabel = L"t \Delta / \pi",
         ylabel = L"\text{Re}(K_{%$(row_idx)%$(col_idx)})",
     )
-    lines!(
-        ax1,
-        ts,
-        ReKs,
-        label = L"\text{Ohmic}:\,\alpha=%$(config.a[1]),\,T=%$(config.temperature)",
-    )
+    lines!(ax1, ts, ReKs, label = L"T=%$(config.temperature),\,\text{s}=%$(config.a[3])")
     axislegend(position = :rt)
     # Imaginary part of Ks
     ax2 = Axis(
@@ -165,18 +160,13 @@ function plot_Ks(dirdata::String, row_idx, col_idx; tmax = nothing)
         xlabel = L"t \Delta / \pi",
         ylabel = L"\text{Im}(K_{%$(row_idx)%$(col_idx)})",
     )
-    lines!(
-        ax2,
-        ts,
-        ImKs,
-        label = L"\text{Ohmic}:\,\alpha=%$(config.a[1]),\,T=%$(config.temperature)",
-    )
+    lines!(ax2, ts, ImKs, label = L"T=%$(config.temperature),\,\text{s}=%$(config.a[3])")
     axislegend(position = :rt)
 
     f
 end
 
-function plot_eigvals(dirdata::String)
+function plot_eigvals(dirdata::String; tmax = nothing)
     effective_hamiltonian = computeKs(dirdata::String)
     # xs: time scaled by Δ / π
     config = loadconfig(dirdata * "/config.json")
@@ -188,6 +178,15 @@ function plot_eigvals(dirdata::String)
     eigvals_Ks_plus = [eig.values[2] for eig in E]
     # Hs eigenvalues
     eigvals_Hs = 2 * sqrt(config.epsilon^2 + config.Delta^2)
+
+    if tmax !== nothing
+        # Shorten time domain
+        mask = ts .<= tmax
+        ts = ts[mask]
+        eigvals_Ks_minus = eigvals_Ks_minus[mask]
+        eigvals_Ks_plus = eigvals_Ks_plus[mask]
+    end
+
     f = Figure()
 
     ax = Axis(f[1, 1], xlabel = L"t \Delta / \pi")
@@ -225,51 +224,3 @@ end
 #     display(p)
 #     savefig(figs_path * "/internal_energy.png")
 # end
-
-# ─────────────────────────────────────────────────────────────
-# Environment
-# - Occupation number of the chain sites
-# - Occupation number of the normal modes
-# ─────────────────────────────────────────────────────────────
-
-function plot_chain_occupation(dirdata::String, t_idx::Integer)
-    data = chain_occupation(dirdata)
-    sites = data.sites
-    ns = data.ns
-    # Time scaled by Δ / π (for labels)
-    ts = data.time
-    config = loadconfig(dirdata * "/config.json")
-    labels = round.(_scalets(ts, config.Delta), digits = 3)
-    # Consider time indexed by t_idx
-    xs = sites[t_idx]
-    ys = ns[t_idx]
-    l = labels[t_idx]
-
-    f = Figure()
-    ax = Axis(f[1, 1], xlabel = L"i,\,\text{chain sites}", ylabel = L"\langle n_i \rangle")
-    lines!(ax, xs, ys, label = L"t\Delta / \pi = %$(l)")
-    axislegend(position = :rt)
-
-    f
-end
-
-function plot_envmodes_occupation(dirdata::String, t_idx::Integer)
-    data = chain_occupation(dirdata)
-    modes = data.modes
-    ns = data.ns
-    # Time scaled by Δ / π (for labels)
-    ts = data.time
-    config = loadconfig(dirdata * "/config.json")
-    labels = round.(_scalets(ts, config.Delta), digits = 3)
-    # Consider time indexed by t_idx
-    xs = modes[t_idx]
-    ys = ns[t_idx]
-    l = labels[t_idx]
-
-    f = Figure()
-    ax = Axis(f[1, 1], xlabel = L"\omega", ylabel = L"\langle n_\omega \rangle")
-    lines!(ax, xs, ys, label = L"t\Delta / \pi = %$(l)")
-    axislegend(position = :rt)
-
-    f
-end

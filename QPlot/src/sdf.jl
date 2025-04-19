@@ -1,3 +1,10 @@
+# ─────────────────────────────────────────────────────────────
+# Spectral density function
+# - sdf
+# - thermalized sdf
+# - chain coefficients
+# ─────────────────────────────────────────────────────────────
+
 function sdf(filename::String)
     p = open(filename) do input
         JSON.parse(read(input, String))
@@ -31,7 +38,7 @@ function thermal_sdf(filename::String)
     f = x -> Base.invokelatest(tmp, a, x)
     # Defining the extended function
     thermal_f = x -> (1 / 2) * (1 + coth(0.5 * x / T)) * sign(x) * f(abs(x))
-    xs = collect(range(extended_support..., 1000))
+    xs = collect(range(extended_support..., 1000000))
     ys = thermal_f.(xs)
     return xs, ys, T
 end
