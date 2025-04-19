@@ -23,7 +23,6 @@ function savefigs(
         save("$outdir/chain_coefficients.png", plot_chain_coefficients(filename))
     end
     if Ks == true
-        save("$outdir/eigvals_Ks_Hs.png", plot_eigvals(dirdata))
         save("$outdir/Ks00.png", plot_Ks(dirdata, 0, 0))
         save("$outdir/Ks01.png", plot_Ks(dirdata, 0, 1))
         if tmax !== Inf
