@@ -3,8 +3,11 @@ function savefigs(
     tomostates = false,
     sdf = false,
     Ks = false,
-    env = false,
+    chain = false,
+    envmodes = false,
     tmax = Inf,
+    xmin = nothing,
+    xmax = nothing
 )
     outdir = "figs/$dirdataname"
     mkpath(outdir)
@@ -28,8 +31,10 @@ function savefigs(
             save("$outdir/Ks01_tmax_$tmax.png", plot_Ks(dirdata, 0, 1; tmax = tmax))
         end
     end
-    if env == true
+    if chain == true
         animate_chain_occupation(dirdata, outdir)
-        animate_envmodes_occupation(dirdata, outdir)
+    end
+    if envmodes == true
+        animate_envmodes_occupation(dirdata, outdir; xmin = xmin, xmax = xmax)
     end
 end

@@ -220,13 +220,16 @@ function animate_envmodes_occupation(
     Delta = config.Delta
     epsilon = config.epsilon
     ωs = 2 * sqrt(epsilon^2 + Delta^2)
-    # Us, KS?? Cosa confronto??
-    es = computeUs(dirdata).Us
+    # Frequency transition of Ks
+    Ks = computeKs(dirdata).Ks
+    E = eigen.(Ks)
+    eminus = [eig.values[1] for eig in E]
+    eplus = [eig.values[2] for eig in E]
     # Stepping function that returns the new data, here simply
     # progress the index `i`.
-    function progress_for_one_step!(i, ns, ts, es)
+    function progress_for_one_step!(i, ns, ts, eminus, eplus)
         i += 1
-        return i, ns[i,:], ts[i], es[i]
+        return i, ns[i,:], ts[i], eminus[i], eplus[i]
     end
 
     # 2. Initialize the `Observable`s of the animation.
@@ -235,10 +238,10 @@ function animate_envmodes_occupation(
     # Dynamic data -> `Observable`
     obs_ys = Observable(ns[1,:])
     obs_time = Observable(ts[1])
-    obs_e = Observable(es[1])
+    obs_eminus = Observable(eminus[1])
+    obs_eplus = Observable(eplus[1])
     # Text for the tile, using `@lift` it will be updated runtine.
     text = @lift("tΔ/π = $($obs_time)")
-
 
     # 3. Plot the `Observable`s and any other static elements   
     fig = Figure()
@@ -257,6 +260,8 @@ function animate_envmodes_occupation(
 
     if xmin !== nothing && xmax !==nothing
         xlims!(ax, xmin, xmax)
+    else
+        xlims!(ax, minimum(xs), maximum(xs))
     end
 
     lines!(
@@ -274,37 +279,43 @@ function animate_envmodes_occupation(
     vlines!(
         ax,
         ωs,
-        color = (:purple, 0.5),
+        color = (:purple, 0.8),
         linewidth = 1,
         linestyle = :dash,
         label = L"\text{eigs}(H_s)",
     )
-    vlines!(ax, -ωs, color = (:purple, 0.5), linewidth = 1, linestyle = :dash)
-    # Vertical lines indicating Us, Ks??
+    vlines!(ax, -ωs, color = (:purple, 0.8), linewidth = 1, linestyle = :dash)
+    # Vertical lines indicating frequency transition of Ks
     vlines!(
         ax,
-        obs_e,
-        color = (:green, 0.5),
+        obs_eminus,
+        color = (:green, 0.8),
         linewidth = 1,
         linestyle = :dash,
-        label = L"??",
+        label = L"\text{eigs}(K_s)",
     )
+    vlines!(ax, obs_eplus, color = (:green, 0.8), linewidth = 1, linestyle = :dash)
 
     axislegend(position = :rt)
 
     # 4. Create the "animation stepping function".
-    function animstep!(i, ns, ts, es, obs_ys, obs_time, obs_e)
-        i, newys, newtime, newe = progress_for_one_step!(i, ns, ts, es)
+    function animstep!(i, ns, ts, eminus, eplus, obs_ys, obs_time, obs_eminus, obs_eplus)
+        i, newys, newtime, neweminus, neweplus = progress_for_one_step!(i, ns, ts, eminus, eplus)
         obs_ys[] = newys
         obs_time[] = newtime
-        obs_e[] = newe
-
+        obs_eminus[] = neweminus
+        obs_eplus[] = neweplus
     end
 
     # 5. Save in a .mp4 file
+    if xmin !== nothing && xmax !==nothing
+        outpath = "$outdir/envmodes_occupation_zoom_$(xmin)_$(xmax).mp4"
+    else
+        outpath = "$outdir/envmodes_occupation.mp4"
+    end
     frames = 1:length(ts)-1
-    record(fig, "$outdir/envmodes_occupation.mp4", frames; framerate = 60) do i
-        animstep!(i, ns, ts, es, obs_ys, obs_time, obs_e)
+    record(fig, filepath, frames; framerate = 60) do i
+        animstep!(i, ns, ts, eminus, eplus, obs_ys, obs_time, obs_eminus, obs_eplus)
     end
 
 end
