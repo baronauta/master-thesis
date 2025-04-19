@@ -147,8 +147,13 @@ end
 # end
 
 
-function internal_energy(Ks, rho)
-    return real(tr.(Ks .* rho[2:end])) # Ks(t=0) not defined
+function computeUs(dirdata::String)
+    effective_hamiltonian = computeKs(dirdata)
+    # Load ρs(t) for system prepared in the "Up" state
+    meas = get_measurements(dirdata * "/measurements_Up.dat", "densitymatrix")
+    Up = meas.result
+    Us = real(tr.(effective_hamiltonian.Ks .* Up[2:end])) # Ks(t=0) not defined
+    return (Us = Us, time = time)
 end
 
 
@@ -170,11 +175,17 @@ function chain_occupation(dirdata::String)
     return (ns = data, sites = sites, time = meas.time)
 end
 
-function _normalmodes(filename::String)
+function _normalmodes(filename::String; extdendN = false)
     # Chain Hamiltonian for the env is H_E = c† A c, where A is a tridiagonal matrix:
     # major diagonal formed by frequencies ωn (n = 0...N-1),
     # sub-diagonal and super-diagonal formed by couplings κn (n = 1...N-1).
-    coeff = chain_coefficients(filename)
+    params = JSON.parsefile(filename)
+    # I fictitiously enlarge the chain, see Riva et al.: PRB 108, 195138 (2023), Appendix E.
+    if extdendN == true
+        params["PolyChaos_nquad"] = 5000
+        params["chain_length"] = 500
+    end
+    coeff = chain_coefficients(params)
     f = coeff.frequencies
     # Couplings κn with n = 0...N-1. But κ0, the one for the TLS-env interaction,
     # must be excluded because it doesn't belong with H_E.
@@ -182,7 +193,6 @@ function _normalmodes(filename::String)
     k = coeff.couplings[2:end]
     A = Tridiagonal(k, f, k)
 
-    # Diagonalize A.
     # Any Hermitian matrix can be diagonalized by a unitary matrix.
     # A = U† D U, with D diagonal matrix and U unitary matrix. Let P = U†.
     # Eigensolver:
@@ -195,30 +205,53 @@ function _normalmodes(filename::String)
 end
 
 function envmodes_occupation(dirdata::String)
-    meas = get_measurements(dirdata * "/measurements_N.dat", "N")
-    # Compute chain coefficients and find normal modes
-    D, P = _normalmodes(dirdata * "/config.json")
-    modes = diag(D)
-    # MPS of sys⊗env: environment sites from {2} to {NN+1}
-    # with NN number of chain sites.
-    NN = length(meas.result)
-    # Measurments performed for each sites for each time in meas.time:
-    # collect result into `data`.
+    # Measurements performed for each sites for each time in meas.time.
+    # MPS of sys⊗env: environment sites from {2} to {N+1}
+    # with N number of chain sites.
     # Let b{i} be the environment modes, occupation number is known, 
-    # i.e <b†{i}b{i}> = meas["N{i}_re"].
+    # i.e <b†{i}b{i}> = meas["N{i}_re"] with i from 2 to N+1.
+    meas = get_measurements(dirdata * "/measurements_N.dat", "N")
+    # Compute chain coefficients and find normal modes.
+    # Set extendN to `true` for computing normal modes for a longer chain
+    # with NN modes.
+    D, P = _normalmodes(dirdata * "/config.json"; extdendN = true)
+    modes = diag(D)
+    NN = length(modes)
     # The chain Hamiltonian of the environment is quadratic in b{i} 
     # with matrix A being tridiagonal, i.e H_E = (b†{i})_i A (b{i})_i.
-    # Diagonalize A: 
-    # A = PDP^(-1); equivalent notation A = U†DU with U†:=P.
+    # Diagonalize A, that is  A = PDP^(-1) with D diagonal;
+    # equivalent notation A = U†DU with U†:=P.
     # Normal modes decomposition of H_E is obtained defining
     # (t{i})_i:= U(b{i})_i. Thus, H_E = (t†{i})_i D (t{i})_i. 
     # Occupation number: 
     # <t†{i}t{i}> = ∑j P[i-1,j-1]^2 * <b†{j}b{j}>.
-    # Modes numbering is i = 2...NN+1, P is a square matrix with indexes 1...NN
+    # Modes numbering is i = 2...NN+1, P is a square matrix with indexes 1...NN.
+    # Only <b†{i}b{i}>, with i from 1 to N+1, are measured, fill the others,
+    # i.e. i from N+2 to NN+1, with 0s entries.
     data = [
-        [sum(P[j-1, i-1]^2 * meas.result["N{$j}_re"][t] for j = 2:NN+1) for i = 2:NN+1]
-        for t = 1:length(meas.time)
+        [
+            sum(
+                P[j-1, i-1]^2 * get(meas.result, "N{$j}_re", zeros(length(meas.time)))[t] for j = 2:NN+1
+            ) for i = 2:NN+1
+        ] for t = 1:length(meas.time)
     ]
 
-    return (ns = data, modes = modes, time = meas.time)
+    open("$dirdata/envmodes_data.dat", "w") do io
+        # Write header
+        println(io, join(["time"; ["mode_$(i)" for i = 1:length(modes)]], ","))
+        # Write each row
+        for (i, row) in enumerate(data)
+            println(io, join([meas.time[i]; row], ","))
+        end
+    end
+
+    open("$dirdata/envmodes_modes.dat", "w") do io
+        # Write header
+        println(io, "frequency")
+        # Write each frequency
+        for f in modes
+            println(io, f)
+        end
+    end
+
 end
