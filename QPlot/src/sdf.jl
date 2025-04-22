@@ -40,7 +40,7 @@ function thermal_sdf(filename::String)
     thermal_f = x -> (1 / 2) * (1 + coth(0.5 * x / T)) * sign(x) * f(abs(x))
     xs = collect(range(extended_support..., 1000000))
     ys = thermal_f.(xs)
-    return xs, ys, T
+    return xs, ys, a, T
 end
 
 function plot_sdf(filename::String)
@@ -53,11 +53,11 @@ function plot_sdf(filename::String)
 end
 
 function plot_thermal_sdf(filename::String)
-    xs, ys, temp = thermal_sdf(filename)
+    xs, ys, a, temp = thermal_sdf(filename)
     # Create and display the plot
     f = Figure()
     ax = Axis(f[1, 1], xlabel = L"\omega", ylabel = L"J_\beta(\omega)")
-    lines!(ax, xs, ys, label = L"T=%$(temp)")
+    lines!(ax, xs, ys, label = L"T=%$(temp),\,\alpha=%$(a[1]),\,s=%$(a[3])")
     axislegend(position = :rt)
     f
 end

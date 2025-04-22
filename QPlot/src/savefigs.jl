@@ -53,12 +53,12 @@ Save effective Hamiltonian Ks plots with a specified time cutoff.
 
 # Arguments
 - `dirdataname::String`: Name of the data directory under `data/`.
-- `tmax::Float`: Maximum time cutoff to apply to the Ks plots.
+- `tmax::AbstractFloat`: Maximum time cutoff to apply to the Ks plots.
 
 # Outputs
 Saves `Ks00_tmax_<tmax>.png` and `Ks01_tmax_<tmax>.png` under `figs/<dirdataname>`.
 """
-function save_Ks(dirdataname::String, tmax::Float)
+function save_Ks(dirdataname::String, tmax::AbstractFloat)
     outdir = "figs/$dirdataname"
     mkpath(outdir)
     dirdata = "data/$dirdataname"
@@ -71,13 +71,13 @@ Generate an animation of environment-mode occupations within specified frequency
 
 # Arguments
 - `dirdataname::String`: Name of the data directory under `data/`.
-- `xmin::Float`: Minimum frequecny bound for the animation.
-- `xmax::Float`: Maximum frequency bound for the animation.
+- `xmin::AbstractFloat`: Minimum frequecny bound for the animation.
+- `xmax::AbstractFloat`: Maximum frequency bound for the animation.
 
 # Outputs
 Writes the animation files into `figs/<dirdataname>`.
 """
-function save_envmodes(dirdataname::String, xmin::Float, xmax::Float)
+function save_envmodes(dirdataname::String, xmin::AbstractFloat, xmax::AbstractFloat)
     outdir = "figs/$dirdataname"
     mkpath(outdir)
     dirdata = "data/$dirdataname"
