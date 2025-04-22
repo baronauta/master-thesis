@@ -51,6 +51,27 @@ function plot_chain_occupation(dirdata::String, t_scaled::Real)
     return f
 end
 
+function _effective_freqs(dirdata::String, time::Vector{Float64})
+    # Compute Ks and align its values corresponding to the
+    # specified time points, assuming all times in `time` 
+    # exist in `Ks.time`.
+    effective_hamiltonian = computeKs(dirdata)
+    inds = [findfirst(x -> isapprox(x, t; atol=1e-8), effective_hamiltonian.time) for t in time]
+    Ks = effective_hamiltonian.Ks[inds]
+    # Print error message if sliced `ks` length doesn't match
+    # `time` lenght.
+    if length(Ks) !== length(time)
+        println("Error: time points mismatch!")
+        return 0
+    end
+    # Frequency transition of Ks (effective Hamiltonian):
+    # ωs' = (E+ - E-)/ħ with E± eigvals of Ks.
+    E = eigen.(Ks)
+    Eminus = [eig.values[1] for eig in E]
+    Eplus = [eig.values[2] for eig in E]
+    freqs = Eplus - Eminus
+    return freqs
+end
 
 function plot_envmodes_occupation(dirdata::String, t_scaled::Real)
     # Collect data
@@ -61,10 +82,15 @@ function plot_envmodes_occupation(dirdata::String, t_scaled::Real)
     modes = rawdata[:]
     # Thermalized spectral density function for reference
     sdfx, sdfy = thermal_sdf(dirdata * "/config.json")
-    # Eigenvalues of Hs (bare system Hamiltonian)
+    # Frequency transition for Hs (bare system Hamiltonian):
+    # Hs = ϵ σz + Δ σx → E± = √(ϵ^2+Δ^2) eigvals of Hs,
+    # frequency transition is ωs = (E+ - E-)/ħ = 2√(ϵ^2+Δ^2).
     Delta = config.Delta
     epsilon = config.epsilon
     ωs = 2 * sqrt(epsilon^2 + Delta^2)
+    # Frequency transition of Ks (effective Hamiltonian):
+    # ωs' = (E+ - E-)/ħ with E± eigvals of Ks.
+    freqs = _effective_freqs(dirdata, meastime)
 
     # Time scaled by Δ / π (for labels)
     config = loadconfig(dirdata * "/config.json")
@@ -77,8 +103,8 @@ function plot_envmodes_occupation(dirdata::String, t_scaled::Real)
     # Extract corresponding values
     xs = sites[t_idx]
     ys = ns[t_idx]
+    ωeff = freqs[t_idx]
     label_t = round(ts[t_idx]; digits = 1)
-    
     
     f = Figure()
     ax = Axis(f[1, 1], xlabel = L"\omega", ylabel = L"\langle n_\omega \rangle")
@@ -97,12 +123,21 @@ function plot_envmodes_occupation(dirdata::String, t_scaled::Real)
     vlines!(
         ax,
         ωs,
-        color = (:purple, 0.5),
+        color = (:purple, 0.8),
         linewidth = 1,
         linestyle = :dash,
-        label = L"\text{eigs}(H_s)",
+        label = L"\omega_s",
     )
-    vlines!(ax, -ωs, color = (:purple, 0.5), linewidth = 1, linestyle = :dash)
+    vlines!(ax, -ωs, color = (:purple, 0.8), linewidth = 1, linestyle = :dash)
+    vlines!(
+        ax,
+        ωeff,
+        color = (:green, 0.8),
+        linewidth = 1,
+        linestyle = :dash,
+        label = L"\omega_s'",
+    )
+    vlines!(ax, -ωeff, color = (:green, 0.8), linewidth = 1, linestyle = :dash)
     axislegend(position = :rt)
 
     f
@@ -216,20 +251,22 @@ function animate_envmodes_occupation(
     ts = round.(_scalets(meastime, config.Delta), digits = 1)
     # Thermalized spectral density function for reference
     sdfx, sdfy = thermal_sdf(dirdata * "/config.json")
-    # Eigenvalues of Hs (bare system Hamiltonian)
+    # Frequency transition for Hs (bare system Hamiltonian):
+    # Hs = ϵ σz + Δ σx → E± = √(ϵ^2+Δ^2) eigvals of Hs,
+    # frequency transition is ωs = (E+ - E-)/ħ = 2√(ϵ^2+Δ^2).
     Delta = config.Delta
     epsilon = config.epsilon
     ωs = 2 * sqrt(epsilon^2 + Delta^2)
-    # Frequency transition of Ks
-    Ks = computeKs(dirdata).Ks
-    E = eigen.(Ks)
-    eminus = [eig.values[1] for eig in E]
-    eplus = [eig.values[2] for eig in E]
+    # Frequency transition of Ks (effective Hamiltonian):
+    # ωs' = (E+ - E-)/ħ with E± eigvals of Ks.
+    freq = _effective_freqs(dirdata, meastime)
+    negfreq = -freq
+
     # Stepping function that returns the new data, here simply
     # progress the index `i`.
-    function progress_for_one_step!(i, ns, ts, eminus, eplus)
+    function progress_for_one_step!(i, ns, ts, freq, negfreq)
         i += 1
-        return i, ns[i,:], ts[i], eminus[i], eplus[i]
+        return i, ns[i, :], ts[i], freq[i], negfreq[i]
     end
 
     # 2. Initialize the `Observable`s of the animation.
@@ -238,8 +275,8 @@ function animate_envmodes_occupation(
     # Dynamic data -> `Observable`
     obs_ys = Observable(ns[1,:])
     obs_time = Observable(ts[1])
-    obs_eminus = Observable(eminus[1])
-    obs_eplus = Observable(eplus[1])
+    obs_freq = Observable(freq[1])
+    obs_negfreq = Observable(negfreq[1])
     # Text for the tile, using `@lift` it will be updated runtine.
     text = @lift("tΔ/π = $($obs_time)")
 
@@ -282,29 +319,29 @@ function animate_envmodes_occupation(
         color = (:purple, 0.8),
         linewidth = 1,
         linestyle = :dash,
-        label = L"\text{eigs}(H_s)",
+        label = L"\omega_s",
     )
     vlines!(ax, -ωs, color = (:purple, 0.8), linewidth = 1, linestyle = :dash)
     # Vertical lines indicating frequency transition of Ks
     vlines!(
         ax,
-        obs_eminus,
+        obs_freq,
         color = (:green, 0.8),
         linewidth = 1,
         linestyle = :dash,
-        label = L"\text{eigs}(K_s)",
+        label = L"\omega_s'",
     )
-    vlines!(ax, obs_eplus, color = (:green, 0.8), linewidth = 1, linestyle = :dash)
+    vlines!(ax, obs_negfreq, color = (:green, 0.8), linewidth = 1, linestyle = :dash)
 
     axislegend(position = :rt)
 
     # 4. Create the "animation stepping function".
-    function animstep!(i, ns, ts, eminus, eplus, obs_ys, obs_time, obs_eminus, obs_eplus)
-        i, newys, newtime, neweminus, neweplus = progress_for_one_step!(i, ns, ts, eminus, eplus)
+    function animstep!(i, ns, ts, freq, negfreq, obs_ys, obs_time, obs_freq, obs_negfreq)
+        i, newys, newtime, newfreq, newnegfreq = progress_for_one_step!(i, ns, ts, freq, negfreq)
         obs_ys[] = newys
         obs_time[] = newtime
-        obs_eminus[] = neweminus
-        obs_eplus[] = neweplus
+        obs_freq[] = newfreq
+        obs_negfreq[] = newnegfreq
     end
 
     # 5. Save in a .mp4 file
@@ -314,8 +351,8 @@ function animate_envmodes_occupation(
         outpath = "$outdir/envmodes_occupation.mp4"
     end
     frames = 1:length(ts)-1
-    record(fig, filepath, frames; framerate = 60) do i
-        animstep!(i, ns, ts, eminus, eplus, obs_ys, obs_time, obs_eminus, obs_eplus)
+    record(fig, outpath, frames; framerate = 60) do i
+        animstep!(i, ns, ts, freq, negfreq, obs_ys, obs_time, obs_freq, obs_negfreq)
     end
 
 end
