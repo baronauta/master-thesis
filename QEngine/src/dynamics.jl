@@ -186,8 +186,8 @@ function _normalmodes(filename::String; extdendN = false)
     params = JSON.parsefile(filename)
     # I fictitiously enlarge the chain, see Riva et al.: PRB 108, 195138 (2023), Appendix E.
     if extdendN == true
-        params["PolyChaos_nquad"] = 5000
-        params["chain_length"] = 500
+        params["PolyChaos_nquad"] = 10000
+        params["chain_length"] = 5000
     end
     coeff = chain_coefficients(params)
     f = coeff.frequencies
