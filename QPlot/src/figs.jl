@@ -20,59 +20,45 @@ end
 # - trace distance between tomographic states
 # ─────────────────────────────────────────────────────────────
 
-function plot_tomostates(dirdata)
-    measurement_files = [
-        ("/measurements_Up.dat", "Up"),
-        ("/measurements_Dn.dat", "Down"),
-        ("/measurements_+.dat", "Plus"),
-        ("/measurements_i.dat", "Trans"),
-    ]
+"""
+    plot_state(dirdata; state="Up")
 
+Plot the expectation values of σ_x, σ_y, σ_z and the trace norm for a single state.
+
+Arguments
+- `dirdata::AbstractString`: Directory containing measurement files and config.json.
+- `state::AbstractString`: One of "Up", "Down", "Plus", or "Down".
+"""
+function plot_state(dirdata; state="Up")
+    file = Dict(
+        "Up"    => "/measurements_Up.dat",
+        "Down"  => "/measurements_Dn.dat",
+        "Plus"  => "/measurements_+.dat",
+        "Trans" => "/measurements_i.dat",
+    )
+    meas = get_measurements(dirdata * file[state], "densitymatrix")
+    measnorm = get_measurements(dirdata * file[state], "norm")
+    # xs: time scaled by Δ / π
     config = loadconfig(dirdata * "/config.json")
+    ts = _scalets(meas.time, config.Delta)
+    # ys: density Matrix
+    rho = meas.result
 
     f = Figure()
+    ax = Axis(
+        f[1, 1],
+        xlabel = L"t \Delta / \pi",
+        ylabel = "$state",
+    )
+    ylims!(ax, -1, 1)
+    # Plot
+    lines!(ax, ts, real.(map(x -> tr(σ1 * x), rho)), label = L"\langle\sigma_x\rangle")
+    lines!(ax, ts, real.(map(x -> tr(σ2 * x), rho)), label = L"\langle\sigma_y\rangle")
+    lines!(ax, ts, real.(map(x -> tr(σ3 * x), rho)), label = L"\langle\sigma_z\rangle")
+    lines!(ax, ts, measnorm.result, label = L"Tr(\rho)")
+    axislegend(position = :rt)
 
-    for (i, (file, title)) in enumerate(measurement_files)
-        # Create a new axis for each subplot (4 rows, 1 column)
-        ax = Axis(
-            f[i, 4],
-            xlabel = L"t \Delta / \pi",
-            ylabel = "$(title)",
-            width = 800,
-            height = 200,
-        )
-        ylims!(ax, -1, 1)
-        # get_measurements returns a named tuple ( time = meas["time"], result = meas["..."] )
-        meas = get_measurements(dirdata * file, "densitymatrix")
-        rho = meas.result
-        ts_scaled = _scalets(meas.time, config.Delta)
-        lines!(
-            ax,
-            ts_scaled,
-            real.(map(x -> tr(σ1 * x), rho)),
-            label = L"\langle\sigma_x\rangle",
-        )
-        lines!(
-            ax,
-            ts_scaled,
-            real.(map(x -> tr(σ2 * x), rho)),
-            label = L"\langle\sigma_y\rangle",
-        )
-        lines!(
-            ax,
-            ts_scaled,
-            real.(map(x -> tr(σ3 * x), rho)),
-            label = L"\langle\sigma_z\rangle",
-        )
-        # plot the norm of the state
-        measnorm = get_measurements(dirdata * file, "norm")
-        ts_scaled = _scalets(measnorm.time, config.Delta)
-        lines!(ax, ts_scaled, measnorm.result, label = L"Tr(\rho)")
-        axislegend(position = :rt)
-    end
-
-    resize_to_layout!(f)
-    f
+    return f
 end
 
 function _trace_distance(rho1, rho2)
