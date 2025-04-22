@@ -45,6 +45,8 @@ function qmap_to_gen(qmap::Vector{Matrix{ComplexF64}}, time::Vector{Float64})
     # Integration step (assumes constant timestep)
     dt = time[2] - time[1]
     # Derivative computed as forward difference, i.e. df(t)/dt = {f(t+1)-f(t)} / dt.
+    # (df(t)/dt)_{t=t_{n+1}} = {f(t_{n+1})-f(t_n)}/dt is not defined 
+    # because t_{n+1} is not defined.
     for t = 1:length(time)-1
         derivative = (qmap[t+1] - qmap[t]) / dt
         inverse = inv(qmap[t])
@@ -152,8 +154,10 @@ function computeUs(dirdata::String)
     # Load ρs(t) for system prepared in the "Up" state
     meas = get_measurements(dirdata * "/measurements_Up.dat", "densitymatrix")
     Up = meas.result
-    Us = real(tr.(effective_hamiltonian.Ks .* Up[2:end])) # Ks(t=0) not defined
-    return (Us = Us, time = time)
+    # I may have a discontinuous behaviour in t=0 since Ks evaluate effective system while
+    # Up[1] is the TLS prepared in a system that has not already interact with the env.
+    Us = real(tr.(effective_hamiltonian.Ks .* Up[1:end-1]))
+    return (Us = Us, time = ffective_hamiltonian.time)
 end
 
 
