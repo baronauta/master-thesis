@@ -126,7 +126,7 @@ function plot_envmodes_occupation(dirdata::String, t_scaled::Real)
         color = (:purple, 0.8),
         linewidth = 1,
         linestyle = :dash,
-        label = L"\omega_s\quad\(H_S\)",
+        label = L"\omega_s\quad (H_S)",
     )
     vlines!(ax, -ωs, color = (:purple, 0.8), linewidth = 1, linestyle = :dash)
     vlines!(
@@ -135,7 +135,7 @@ function plot_envmodes_occupation(dirdata::String, t_scaled::Real)
         color = (:green, 0.8),
         linewidth = 1,
         linestyle = :dash,
-        label = L"\omega_s'\quad\(K_S\)",
+        label = L"\omega_s'\quad (K_S)",
     )
     vlines!(ax, -ωeff, color = (:green, 0.8), linewidth = 1, linestyle = :dash)
     axislegend(position = :rt)
