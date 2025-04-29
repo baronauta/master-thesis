@@ -1,5 +1,5 @@
 "For my checks."
-function sdf_constant(; alpha = 0.1, epsilon = 0.5, Delta = 0.2, omegac = 1, s = 1)
+function _sdf_constant(; alpha = 0.1, epsilon = 0.5, Delta = 0.2, omegac = 1, s = 1)
     omegas = 2 * sqrt(epsilon^2 + Delta^2)
     π / 2 * alpha / (omegas^s * omegac^(s - 1))
 end
