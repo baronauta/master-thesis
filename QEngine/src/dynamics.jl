@@ -63,8 +63,7 @@ function qmap_to_gen(qmap::Vector{Matrix{ComplexF64}}, time::Vector{Float64})
 end
 
 """
-
-    _changebasis!(Φ::Matrix{ComplexF64}, from_basis::Vector{Matrix{ComplexF64}}, to_basis::Vector{Matrix{ComplexF64}})
+    changebasis(Φ::Matrix{ComplexF64}, from_basis::Vector{Matrix{ComplexF64}}, to_basis::Vector{Matrix{ComplexF64}})
 
 Change the representation of a matrix between orthonormal operator bases.
 
@@ -79,7 +78,7 @@ The transformation is performed via a change-of-basis matrix `Λ` with entries �
     between significantly different bases (e.g., Pauli ↔ canonical). Small components (|x| < 1e-12)
     are rounded to zero to reduce numerical noise.
 """
-function _changebasis!(
+function changebasis(
     Φ::Matrix{ComplexF64},
     from_basis::Vector{Matrix{ComplexF64}},
     to_basis::Vector{Matrix{ComplexF64}},
@@ -92,9 +91,8 @@ function _changebasis!(
     return Φnew = map(x -> abs(real(x)) < 1e-12 && abs(imag(x)) < 1e-12 ? 0.0 : x, Φnew)
 end
 
-
 """
-    _changebasis!(Φ::Matrix{ComplexF64})
+    changebasis(Φ::Matrix{ComplexF64})
 
 Change the representation of a matrix between orthonormal operator bases:
 - from the Pauli basis {σ₀/√2, σ₁/√2, σ₂/√2, σ₃/√2};
@@ -102,12 +100,12 @@ Change the representation of a matrix between orthonormal operator bases:
 
 Both bases are orthonormal with respect to the Hilbert-Schmidt inner product ⟨A, B⟩ = Tr[A†B].
 """
-function _changebasis!(Φ::Matrix{ComplexF64})
+function changebasis(Φ::Matrix{ComplexF64})
     # Transformation matrix is Λ = 1/√2 ⋅ M, where M is defined as follows.
     # Given Φ in Pauli basis its representation in the canonical basis is
     # Λ† Φ Λ = 1/2 M† Φ M.
     # I do this to avoid numerical roundings of √2.
-    M = Matrix{ComplexF64}([1 0 0 1; 0 1 1 0; 0 -im im 0; 1 0 0 -1])
+    M = Matrix{ComplexF64}([1 0 0 1; 0 1 1 0; 0 im -im 0; 1 0 0 -1])
     return 1/2 * M' * Φ * M
 end
 
@@ -117,7 +115,7 @@ function krausdecomposition(M::Matrix{ComplexF64})
     #       M = Q Λ Q† = ∑ₖ λₖ q(k) q(k)†,
     # where the k-th column of Q is the eigenvector q(k) of M,
     # and λₖ are the corresponding eigevalues.
-    if M != M'
+    if !(M ≈ M')
         throw(ArgumentError("Input matrix is not Hermitian"))
     end
     E = eigen(M)
@@ -151,19 +149,23 @@ function computeKs(eigvals::Vector{Float64}, E::Vector{Matrix{ComplexF64}})
 end
 
 function computeKs(dirdata::String)
-    # Execute map tomography given the density matrix of the states composing a tomographic basis.
+    # Map tomography: from data obtain the dynamical map Φ for every t in the Pauli basis.
     qmap = qmaptomography(dirdata)
     # Change dynamics description from dynamical map Φ to generator L = dΦ/dt Φ^(-1).
-    gen = qmap_to_gen(qmap.qmap, qmap.time)
+    L = qmap_to_gen(qmap.qmap, qmap.time)
+    time = L.time; gen = L.gen
 
     # Ks(t)
-    time = gen.time
-    L = gen.gen
     Ks = Vector{Matrix{ComplexF64}}()
-    for t = 1:length(time)
+    for t in 1:length(time)
+        # gen[t] is in the Pauli basis, rewrite in computational basis
+        gen_canonical = changebasis(gen[t])
+        # gen_canonical is an A-represention matrix of the quantum generator L,
+        # kraus decomposition should be applied to B-represention matrix (Choi matrix).
+        choimatrix = reshape(A2Bmatrix * vec(gen_canonical), (4, 4))
         # Kraus decomposition of the generator at time t
-        eigvals, eigvecs = krausdecomposition(L[t])
-        push!(Ks, computeKs(eigvals, eigvecs))
+        eigvals, krausoperators = krausdecomposition(choimatrix)
+        push!(Ks, computeKs(eigvals, krausoperators))
     end
     return (Ks = Ks, time = time)
 end

@@ -2,7 +2,7 @@ using QEngine
 using LinearAlgebra
 using Test
 
-import QEngine: _changebasis!, A2Bmatrix, krausdecomposition
+import QEngine: changebasis, A2Bmatrix, krausdecomposition
 
 @testset "Depolarizing channel" begin
 
@@ -22,7 +22,7 @@ import QEngine: _changebasis!, A2Bmatrix, krausdecomposition
 
     p = 0.1
     Φ_pauli = depolarizing_channel_pauli(p)
-    Φ_canonical = _changebasis!(Φ_pauli)
+    Φ_canonical = changebasis(Φ_pauli)
 
     # Compare action on a test state ρ
     ρ₊ = Matrix{ComplexF64}([0.5 0.5; 0.5 0.5]); vecρ₊ = vec(ρ₊)
@@ -35,6 +35,8 @@ import QEngine: _changebasis!, A2Bmatrix, krausdecomposition
     # kraus decomposition should be applied to B-represention matrix (Choi matrix).
     choimatrix = reshape(A2Bmatrix * vec(Φ_canonical), (4, 4))
     eigvals, krausoperators = krausdecomposition(choimatrix)
+    # Check: λₖ ∈ Real 
+    @test all(isreal, eigvals)
     # Check: ∑ₖ λₖ Eₖ† Eₖ = I
     @test sum([eigvals[k] * krausoperators[k]'*krausoperators[k] for k in eachindex(eigvals)]) ≈ I
     # Kraus operator for depolarizing channel are known:

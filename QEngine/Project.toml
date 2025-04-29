@@ -11,6 +11,7 @@ JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MPSTimeEvolution = "509c1b6a-26da-4538-875f-50b31a76b593"
 TEDOPA = "b335cece-bf51-4f8f-ae23-b29b889c1946"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 DelimitedFiles = "1.9.1"
@@ -20,3 +21,4 @@ JSON = "0.21.4"
 LinearAlgebra = "1.11.0"
 MPSTimeEvolution = "0.5.1"
 TEDOPA = "0.1.2"
+Test = "1.11.0"
