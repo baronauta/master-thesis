@@ -1,11 +1,11 @@
 # ─────────────────────────────────────────────────────────────
 # Quantum dynamics
 #
-# Let B(H) be the space of bounded linear operators on Hilbert space H.
-# Dynamical map Φ(t): B(H) → B(H);
-# dynamics of a state is described by ρ(t) = Φ(t)[ρ(0)].
-# Generator L(t): B(H) → B(H);
-# dynamics of a state is described by d/dt ρ(t) = L(t)[ρ(t)].
+# Let S(H) be the set of physical state on Hilbert space H.
+# - Dynamical map: 
+#   Φ(t): S(H) → S(H); ρ(t) = Φ(t)[ρ(0)].
+# - Generator:
+#   L(t): S(H) → S(H); d/dt ρ(t) = L(t)[ρ(t)].
 #
 # ─────────────────────────────────────────────────────────────
 
@@ -29,7 +29,7 @@ function qmaptomography(dirdata)
 
     # Compute the quantum map as a vector of matrices
     qmap = map(eachindex(Up)) do t
-        [0.5 * tr(σi' * evolved_basis[j][t]) for σi in pauli_basis, j = 1:4]
+        [0.5 * tr(σi' * evolved_basis[j][t]) for σi in paulimatrices, j = 1:4]
     end
     qmap = [reshape(q, 4, 4) for q in qmap]
 
@@ -39,23 +39,46 @@ end
 
 function qmap_to_gen(qmap::Vector{Matrix{ComplexF64}}, time::Vector{Float64})
     # The generator L(t) is related to the dynamical map Φ(t)
-    # by means of L = dΦ/dt Φ^(-1).
-    gen = Vector{Matrix{ComplexF64}}()
-
+    # by means of L(t) = dΦ/dt Φ^(-1).
+    N = length(time)
+    gen = Vector{Matrix{ComplexF64}}(undef, N)
     # Integration step (assumes constant timestep)
     dt = time[2] - time[1]
-    # Derivative computed as forward difference, i.e. df(t)/dt = {f(t+1)-f(t)} / dt.
-    # (df(t)/dt)_{t=t_{n+1}} = {f(t_{n+1})-f(t_n)}/dt is not defined 
-    # because t_{n+1} is not defined.
-    for t = 1:length(time)-1
-        derivative = (qmap[t+1] - qmap[t]) / dt
-        inverse = inv(qmap[t])
-        push!(gen, derivative * inverse)
+
+    # First point: forward difference
+    derivative = (qmap[2] - qmap[1]) / dt
+    gen[1] = derivative * inv(qmap[1])
+
+    # Interior points: centered difference
+    for t in 2:N-1
+        derivative = (qmap[t+1] - qmap[t-1]) / (2*dt)
+        gen[t] = derivative * inv(qmap[t])
     end
 
-    return (gen = gen, time = time[1:end-1])
+    # Last point: backward difference
+    derivative = (qmap[N] - qmap[N-1]) / dt
+    gen[N] = derivative * inv(qmap[N])
+
+    return (gen = gen, time = time)
 end
 
+"""
+
+    _changebasis!(Φ::Matrix{ComplexF64}, from_basis::Vector{Matrix{ComplexF64}}, to_basis::Vector{Matrix{ComplexF64}})
+
+Change the representation of a matrix between orthonormal operator bases.
+
+Transforms the matrix `Φ`, which is assumed to be expressed in the operator basis `from_basis`,
+into its representation in the target basis `to_basis`. Both bases must be orthonormal with
+respect to the Hilbert-Schmidt inner product ⟨A, B⟩ = Tr[A†B] (check it by yourself).
+
+The transformation is performed via a change-of-basis matrix `Λ` with entries Λₖₗ = Tr[(fromₖ)† * toₗ].
+
+!!! warning
+    Numerical rounding errors may occur during the transformation, especially when converting
+    between significantly different bases (e.g., Pauli ↔ canonical). Small components (|x| < 1e-12)
+    are rounded to zero to reduce numerical noise.
+"""
 function _changebasis!(
     Φ::Matrix{ComplexF64},
     from_basis::Vector{Matrix{ComplexF64}},
@@ -63,32 +86,53 @@ function _changebasis!(
 )
     # Hilbert-Schmidt inner product: <A,B> = Tr[A†B]
     Λ = [tr(A' * B) for A in from_basis, B in to_basis]
-    return Λ' * Φ * Λ
+    Φnew = Λ' * Φ * Λ
+    # I noticed that when transforming between Pauli basis to canonical basis, this computation
+    # suffers from rounding errors.
+    return Φnew = map(x -> abs(real(x)) < 1e-12 && abs(imag(x)) < 1e-12 ? 0.0 : x, Φnew)
 end
 
-function krausdecomposition(gen::Matrix{ComplexF64})
-    # Generator computed with `qmap_to_gen` is in the pauli basis, I want to work
-    # in the computational basis (here named `T_basis`).
-    gen = _changebasis!(gen, pauli_basis, T_basis)
-    # The matrix representation of the generator is in the A-form, that is not Hermitian.
-    # Reshuffle its elements to obtain the B-form matrix representation: 
-    # the matrix representing the generator is now Hermitian, thus it admits a spectral decomposition.
-    # The B-form matrix representation of the generator coincides with the Choi matrix.
-    choimatrix = reshape(A2Bmatrix * vec(gen), (4, 4))
 
-    # Eigensolver
-    E = eigen(choimatrix)
-    # E.values contains the eigenvalues
-    eigvals = E.values
-    # E.vectors contains the eigenvectors (stored as columns)
-    eigcols = E.vectors
+"""
+    _changebasis!(Φ::Matrix{ComplexF64})
 
-    # Kraus decomposition of the generator: L(t)[̢ρ(t)] = ∑k λk Ek(t) ρ(t) Ek†(t).
-    # - λk eigenvalues of the choi matrix
-    # - Ek Kraus operator is obtained as Ek = ∑a v(k) Ta where v(k) is a eigenvectors of the Choi matrix.
+Change the representation of a matrix between orthonormal operator bases:
+- from the Pauli basis {σ₀/√2, σ₁/√2, σ₂/√2, σ₃/√2};
+- to the canonical basis {|0⟩⟨0|, |0⟩⟨1|, |1⟩⟨0|, |1⟩⟨1|}.
+
+Both bases are orthonormal with respect to the Hilbert-Schmidt inner product ⟨A, B⟩ = Tr[A†B].
+"""
+function _changebasis!(Φ::Matrix{ComplexF64})
+    # Transformation matrix is Λ = 1/√2 ⋅ M, where M is defined as follows.
+    # Given Φ in Pauli basis its representation in the canonical basis is
+    # Λ† Φ Λ = 1/2 M† Φ M.
+    # I do this to avoid numerical roundings of √2.
+    M = Matrix{ComplexF64}([1 0 0 1; 0 1 1 0; 0 -im im 0; 1 0 0 -1])
+    return 1/2 * M' * Φ * M
+end
+
+function krausdecomposition(M::Matrix{ComplexF64})
+    # M is Hermitian ⇒ admits spectral decomposition:
+    # i.e. there exists a unitary Q and real eigenvalues λₖ such that
+    #       M = Q Λ Q† = ∑ₖ λₖ q(k) q(k)†,
+    # where the k-th column of Q is the eigenvector q(k) of M,
+    # and λₖ are the corresponding eigevalues.
+    if M != M'
+        throw(ArgumentError("Input matrix is not Hermitian"))
+    end
+    E = eigen(M)
+    # E.values contains the eigenvalues;
+    # E.vectors contains the eigenvectors (stored as columns).
+    eigvals = E.values; Q = E.vectors
+    
+    # Kraus decomposition of a superoperator S: S(H) → S(H):
+    #       S(ρ) = ∑ₖ λₖ Eₖ ρ Eₖ†, 
+    # where
+    # - λₖ eigenvalues of matrix;
+    # - Eₖ = ∑ₐ qₐ(k) τₐ, where q(k)=Q[:,k] is k-th column of Q and {τₐ} are the canonical operator basis. 
     krausoperators = Vector{Matrix{ComplexF64}}()
     for k = 1:length(eigvals)
-        val = sum(eigcols[:, k] .* T_basis)
+        val = sum(Q[:, k] .* canonical_op_basis)
         push!(krausoperators, val)
     end
     return eigvals, krausoperators
@@ -139,9 +183,9 @@ end
 #         push!(
 #             Ks_check,
 #             -im / 4.0 * sum([
-#                 T_basis[a]' * kraus_term(EE[t], choi_eigvals[t], T_basis[a]) -
-#                 kraus_term(EE[t], choi_eigvals[t], T_basis[a]) * T_basis[a]' for
-#                 a in axes(T_basis, 1)
+#                 canonical_op_basis[a]' * kraus_term(EE[t], choi_eigvals[t], canonical_op_basis[a]) -
+#                 kraus_term(EE[t], choi_eigvals[t], canonical_op_basis[a]) * canonical_op_basis[a]' for
+#                 a in axes(canonical_op_basis, 1)
 #             ]),
 #         )
 #     end
