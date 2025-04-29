@@ -9,12 +9,12 @@ using JSON
 using LinearAlgebra
 using TEDOPA
 
-export σ0, σ1, σ2, σ3
+export paulimatrices, canonical_op_basis
 include("constants.jl")
 
 include("mps_spin_boson.jl")
 
-export sdf_constant, setup, loadconfig
+export  setup, loadconfig
 include("setup.jl")
 
 export chain_coefficients, tomodynamics, envdynamics, get_measurements
