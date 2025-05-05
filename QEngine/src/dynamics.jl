@@ -9,13 +9,21 @@
 #
 # ─────────────────────────────────────────────────────────────
 
+function horrendus_filtering!(qmap::Matrix{ComplexF64})
+    M = [ 1 1 0 0; 
+          1 1 0 0; 
+          0 0 1 1; 
+          0 0 1 1]
+    qmap = qmap .* M
+end
+
 """
     qmaptomography(dirdata::String)
 
 Performs quantum process tomography from measurement data in `dirdata`. 
 Returns a named tuple with the quantum map (`qmap`) and associated `time` vector.
 """
-function qmaptomography(dirdata)
+function qmaptomography(dirdata::String)
     # Load measurements and extract results
     meas_files = ["Up", "Dn", "+", "i"]
     meas_data = Dict(
@@ -38,6 +46,8 @@ function qmaptomography(dirdata)
         [0.5 * tr(σi' * evolved_basis[j][t]) for σi in paulimatrices, j = 1:4]
     end
     qmap = [reshape(q, 4, 4) for q in qmap]
+
+    horrendus_filtering!.(qmap)
 
     # Return results as named tuple
     return (qmap = qmap, time = time)
