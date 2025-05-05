@@ -11,6 +11,9 @@
 #   - Animate chain site occupations over time (.mp4)
 #   - Animate normal mode occupations over time (.mp4)
 #
+# This file also contains functions for visualizing:
+#   - Comparison between transition frequency of Hs and Ks
+#
 # Note
 # In QEngine are provided the function `chain_occupation` and
 # `envmodes_occupation`. Since the computation of normal modes
@@ -19,6 +22,11 @@
 # will read data from this files.
 # ─────────────────────────────────────────────────────────────
 
+"""
+    plot_chain_occupation(dirdata::String, t_scaled::Real)
+
+Plot the chain site occupations ⟨nᵢ⟩ at a given scaled time `t_scaled` using data from `dirdata`.
+"""
 function plot_chain_occupation(dirdata::String, t_scaled::Real)
     # Collect data
     data = chain_occupation(dirdata)
@@ -51,28 +59,11 @@ function plot_chain_occupation(dirdata::String, t_scaled::Real)
     return f
 end
 
-function _effective_freqs(dirdata::String, time::Vector{Float64})
-    # Compute Ks and align its values corresponding to the
-    # specified time points, assuming all times in `time` 
-    # exist in `Ks.time`.
-    effective_hamiltonian = computeKs(dirdata)
-    inds = [findfirst(x -> isapprox(x, t; atol=1e-8), effective_hamiltonian.time) for t in time]
-    Ks = effective_hamiltonian.Ks[inds]
-    # Print error message if sliced `ks` length doesn't match
-    # `time` lenght.
-    if length(Ks) !== length(time)
-        println("Error: time points mismatch!")
-        return 0
-    end
-    # Frequency transition of Ks (effective Hamiltonian):
-    # ωs' = (E+ - E-)/ħ with E± eigvals of Ks.
-    E = eigen.(Ks)
-    Eminus = [eig.values[1] for eig in E]
-    Eplus = [eig.values[2] for eig in E]
-    freqs = Eplus - Eminus
-    return freqs
-end
+"""
+    plot_envmodes_occupation(dirdata::String, t_scaled::Real)
 
+Plot environment mode occupations ⟨n_ω⟩ at a given scaled time `t_scaled`, with spectral density and frequency transitions.
+"""
 function plot_envmodes_occupation(dirdata::String, t_scaled::Real)
     # Collect data
     (rawdata, header) = readdlm("$dirdata/envmodes_data.dat", ',', Float64, header = true)
@@ -105,7 +96,7 @@ function plot_envmodes_occupation(dirdata::String, t_scaled::Real)
     ys = ns[t_idx]
     ωeff = freqs[t_idx]
     label_t = round(ts[t_idx]; digits = 1)
-    
+
     f = Figure()
     ax = Axis(f[1, 1], xlabel = L"\omega", ylabel = L"\langle n_\omega \rangle")
     # Modes occupation
@@ -142,6 +133,55 @@ function plot_envmodes_occupation(dirdata::String, t_scaled::Real)
 
     f
 end
+
+"""
+    plot_transitionfreqs(dirdata::String; tmax = nothing)
+
+Plot a comparison between transition frequency of the bare Hamiltonian Hs and the effective Hamiltonian Ks.
+"""
+function plot_transitionfreqs(dirdata::String; tmax = nothing)
+    config = loadconfig(dirdata * "/config.json")
+
+    # Bare Hamiltonian Hs (time-independent frequency)
+    freq_Hs = 2 * sqrt(config.epsilon^2 + config.Delta^2)
+
+    # Effective Hamiltonian Ks (time-dependent frequency)
+    (rawdata, header) = readdlm("$dirdata/envmodes_data.dat", ',', Float64, header = true)
+    meastime = rawdata[:, 1]
+    freqs_Ks = effective_freqs(dirdata, meastime)
+
+    # xs: time scaled by Δ / π
+    ts = _scalets(meastime, config.Delta)
+
+    if tmax !== nothing
+        # Shorten time domain
+        mask = ts .<= tmax
+        ts = ts[mask]
+        freqs_Ks = freqs_Ks[mask]
+    end
+
+    f = Figure()
+
+    ax = Axis(
+        f[1, 1],
+        xlabel = L"t \Delta / \pi",
+        ylabel = L"\text{Transition frequency}\;\omega",
+    )
+    # Hs eigenvalues
+    hlines!(
+        ax,
+        freq_Hs,
+        color = (:purple, 0.8),
+        linestyle = :dash,
+        label = L"\text{Bare Hamiltonian}\;H_s",
+    )
+    # Ks eigenvalues
+    lines!(ax, ts, freqs_Ks, color = :green, label = L"\text{Effective Hamiltonian}\;K_s")
+    axislegend(position = :rt)
+
+    f
+end
+
 
 
 # ─────────────────────────────────────────────────────────────
@@ -259,7 +299,7 @@ function animate_envmodes_occupation(
     ωs = 2 * sqrt(epsilon^2 + Delta^2)
     # Frequency transition of Ks (effective Hamiltonian):
     # ωs' = (E+ - E-)/ħ with E± eigvals of Ks.
-    freq = _effective_freqs(dirdata, meastime)
+    freq = effective_freqs(dirdata, meastime)
     negfreq = -freq
 
     # Stepping function that returns the new data, here simply
@@ -273,7 +313,7 @@ function animate_envmodes_occupation(
     # Static data -> no `Observable`
     xs = modes
     # Dynamic data -> `Observable`
-    obs_ys = Observable(ns[1,:])
+    obs_ys = Observable(ns[1, :])
     obs_time = Observable(ts[1])
     obs_freq = Observable(freq[1])
     obs_negfreq = Observable(negfreq[1])
@@ -295,7 +335,7 @@ function animate_envmodes_occupation(
     # Rescale thermalized sdf (it is just for reference)
     sdfy = sdfy ./ maximum(sdfy) .* 1 / 10 * ymax
 
-    if xmin !== nothing && xmax !==nothing
+    if xmin !== nothing && xmax !== nothing
         xlims!(ax, xmin, xmax)
     else
         xlims!(ax, minimum(xs), maximum(xs))
@@ -319,7 +359,7 @@ function animate_envmodes_occupation(
         color = (:purple, 0.8),
         linewidth = 1,
         linestyle = :dash,
-        label = L"\omega_s\quad (H_S)",
+        label = L"\text{Transition frequency } H_S",
     )
     vlines!(ax, -ωs, color = (:purple, 0.8), linewidth = 1, linestyle = :dash)
     # Vertical lines indicating frequency transition of Ks
@@ -329,7 +369,7 @@ function animate_envmodes_occupation(
         color = (:green, 0.8),
         linewidth = 1,
         linestyle = :dash,
-        label = L"\omega_s'\quad (K_S)",
+        label = L"\text{Transition frequency } K_S",
     )
     vlines!(ax, obs_negfreq, color = (:green, 0.8), linewidth = 1, linestyle = :dash)
 
@@ -337,7 +377,8 @@ function animate_envmodes_occupation(
 
     # 4. Create the "animation stepping function".
     function animstep!(i, ns, ts, freq, negfreq, obs_ys, obs_time, obs_freq, obs_negfreq)
-        i, newys, newtime, newfreq, newnegfreq = progress_for_one_step!(i, ns, ts, freq, negfreq)
+        i, newys, newtime, newfreq, newnegfreq =
+            progress_for_one_step!(i, ns, ts, freq, negfreq)
         obs_ys[] = newys
         obs_time[] = newtime
         obs_freq[] = newfreq
@@ -345,7 +386,7 @@ function animate_envmodes_occupation(
     end
 
     # 5. Save in a .mp4 file
-    if xmin !== nothing && xmax !==nothing
+    if xmin !== nothing && xmax !== nothing
         outpath = "$outdir/envmodes_occupation_zoom_$(xmin)_$(xmax).mp4"
     else
         outpath = "$outdir/envmodes_occupation.mp4"
