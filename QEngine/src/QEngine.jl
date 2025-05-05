@@ -9,7 +9,7 @@ using JSON
 using LinearAlgebra
 using TEDOPA
 
-export paulimatrices, canonical_op_basis
+export σ0, σ1, σ2, σ3, paulimatrices, canonical_op_basis
 include("constants.jl")
 
 include("mps_spin_boson.jl")
@@ -20,7 +20,7 @@ include("setup.jl")
 export chain_coefficients, tomodynamics, envdynamics, get_measurements
 include("simulation.jl")
 
-export computeKs, computeUs, chain_occupation, envmodes_occupation
+export computeKs, computeUs, chain_occupation, envmodes_occupation, effective_freqs
 include("dynamics.jl")
 
 end
