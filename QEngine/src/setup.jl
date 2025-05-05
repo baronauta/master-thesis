@@ -1,9 +1,3 @@
-"For my checks."
-function _sdf_constant(; alpha = 0.1, epsilon = 0.5, Delta = 0.2, omegac = 1, s = 1)
-    omegas = 2 * sqrt(epsilon^2 + Delta^2)
-    π / 2 * alpha / (omegas^s * omegac^(s - 1))
-end
-
 """
     setup(dirname::String)
 
@@ -98,7 +92,7 @@ function _handle_predefined_ohmic(epsilon, Delta)
         "Enter the spectral density parameters as comma-separated values (e.g. 0.1,1.0,1.0): ",
     )
     a = parse.(Float64, split(readline(), ","))
-    println("Possible rescaling: α → α / (ωs)^s. Dou want to apply? [Y/N]")
+    println("Possible rescaling: α → α / (ωₛ)^s. Dou want to apply? [Y/N]")
     scale = readline()
     if scale == "Y"
         # Rescaling of α with the frequency value of the system.
