@@ -8,15 +8,15 @@ import QEngine: changebasis, A2Bmatrix, krausdecomposition
 
     # Depolarizing channel: Φ(ρ) = (1-p) * ρ + p * I/2
     function depolarizing_channel(ρ, p)
-        (1-p)*ρ + p * I/2
-    end 
+        (1 - p) * ρ + p * I / 2
+    end
 
     # Depolarizing channel expressed in terms of Pauli matrices:
     # Φ(ρ) = (1 - 3p/4) * ρ + p/4 * (XρX + YρY + ZρZ).
     # Bloch vector is trasformed as
     # rₖ = Tr[ρσₖ] → rₖ' = Tr[Φ(ρ)σₖ] = (1-p)rₖ.
     function depolarizing_channel_pauli(p)
-        D = Diagonal([1.0, 1-p, 1-p, 1-p])
+        D = Diagonal([1.0, 1 - p, 1 - p, 1 - p])
         return Matrix{ComplexF64}(D)
     end
 
@@ -25,9 +25,11 @@ import QEngine: changebasis, A2Bmatrix, krausdecomposition
     Φ_canonical = changebasis(Φ_pauli)
 
     # Compare action on a test state ρ
-    ρ₊ = Matrix{ComplexF64}([0.5 0.5; 0.5 0.5]); vecρ₊ = vec(ρ₊)
-    vecρ_out = Φ_canonical * vecρ₊; ρ_out = reshape(vecρ_out, 2, 2)
-    ρ_expected = depolarizing_channel(ρ₊,p)
+    ρ₊ = Matrix{ComplexF64}([0.5 0.5; 0.5 0.5])
+    vecρ₊ = vec(ρ₊)
+    vecρ_out = Φ_canonical * vecρ₊
+    ρ_out = reshape(vecρ_out, 2, 2)
+    ρ_expected = depolarizing_channel(ρ₊, p)
     @test norm(ρ_out - ρ_expected) ≈ 0
 
     # Kraus decomposition
@@ -38,7 +40,9 @@ import QEngine: changebasis, A2Bmatrix, krausdecomposition
     # Check: λₖ ∈ Real 
     @test all(isreal, eigvals)
     # Check: ∑ₖ λₖ Eₖ† Eₖ = I
-    @test sum([eigvals[k] * krausoperators[k]'*krausoperators[k] for k in eachindex(eigvals)]) ≈ I
+    @test sum([
+        eigvals[k] * krausoperators[k]' * krausoperators[k] for k in eachindex(eigvals)
+    ]) ≈ I
     # Kraus operator for depolarizing channel are known:
     # Φ(ρ) = ∑ₖ Mₖ ρ Mₖ†, with M₀=√(1-3p/4)σ₀, Mⱼ=√(p/4)σⱼ.
     # Check: √(λₖ) Eₖ = Mₖ...problems in finding appropriate matching.

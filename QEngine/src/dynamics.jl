@@ -62,8 +62,8 @@ function qmap_to_gen(qmap::Vector{Matrix{ComplexF64}}, time::Vector{Float64})
     gen[1] = derivative * inv(qmap[1])
 
     # Interior points: centered difference
-    for t in 2:N-1
-        derivative = (qmap[t+1] - qmap[t-1]) / (2*dt)
+    for t = 2:N-1
+        derivative = (qmap[t+1] - qmap[t-1]) / (2 * dt)
         gen[t] = derivative * inv(qmap[t])
     end
 
@@ -118,7 +118,7 @@ function changebasis(Φ::Matrix{ComplexF64})
     # Λ† Φ Λ = 1/2 M† Φ M.
     # I do this to avoid numerical roundings of √2.
     M = Matrix{ComplexF64}([1 0 0 1; 0 1 1 0; 0 im -im 0; 1 0 0 -1])
-    return 1/2 * M' * Φ * M
+    return 1 / 2 * M' * Φ * M
 end
 
 """
@@ -140,8 +140,9 @@ function krausdecomposition(M::Matrix{ComplexF64})
     E = eigen(M)
     # E.values contains the eigenvalues;
     # E.vectors contains the eigenvectors (stored as columns).
-    eigvals = E.values; Q = E.vectors
-    
+    eigvals = E.values
+    Q = E.vectors
+
     # Kraus decomposition of a superoperator S: S(H) → S(H):
     #       S(ρ) = ∑ₖ λₖ Eₖ ρ Eₖ†, 
     # where
@@ -170,10 +171,12 @@ The transformed density matrix under the Kraus form:
 
     Φ(ρ) = ∑ₖ λₖ Eₖ ρ Eₖ†
 """
-function dynamics_krausform(eigvals::Vector{Float64}, E::Vector{Matrix{ComplexF64}}, ρ::Matrix{ComplexF64})
-    sum([
-        eigvals[k] * E[k] * ρ * E[k]' for k in axes(eigvals, 1)
-    ])
+function dynamics_krausform(
+    eigvals::Vector{Float64},
+    E::Vector{Matrix{ComplexF64}},
+    ρ::Matrix{ComplexF64},
+)
+    sum([eigvals[k] * E[k] * ρ * E[k]' for k in axes(eigvals, 1)])
 end
 
 """
@@ -215,12 +218,11 @@ A `Matrix{ComplexF64}` representing the effective Hamiltonian `Ks(t)`, computed 
 where `S(·)` is the superoperator defined by the Kraus decomposition, and `{τₐ}` is the canonical operator basis.
 """
 function computeKs_check(eigvals::Vector{Float64}, E::Vector{Matrix{ComplexF64}})
-    total = 
-        sum([
-            canonical_op_basis[a]' * dynamics_krausform(E, eigvals, canonical_op_basis[a]) -
-                dynamics_krausform(E, eigvals, canonical_op_basis[a]) * canonical_op_basis[a]' for
-                a in axes(canonical_op_basis, 1)
-        ])
+    total = sum([
+        canonical_op_basis[a]' * dynamics_krausform(E, eigvals, canonical_op_basis[a]) -
+        dynamics_krausform(E, eigvals, canonical_op_basis[a]) * canonical_op_basis[a]'
+        for a in axes(canonical_op_basis, 1)
+    ])
     return -im / 4.0 * total
 end
 
@@ -230,16 +232,17 @@ end
 Compute the effective hamiltonian Ks(t) of a time-local quantum generator from measurement data in `dirdata`.  
 Returns a named tuple with time-dependent matrices `Ks` and associated `time` vector.
 """
-function computeKs(dirdata::String; check=false)
+function computeKs(dirdata::String; check = false)
     # Map tomography: from data obtain the dynamical map Φ for every t in the Pauli basis.
     qmap = qmaptomography(dirdata)
     # Change dynamics description from dynamical map Φ to generator L = dΦ/dt Φ^(-1).
     L = qmap_to_gen(qmap.qmap, qmap.time)
-    time = L.time; gen = L.gen
+    time = L.time
+    gen = L.gen
 
     # Ks(t)
     Ks = Vector{Matrix{ComplexF64}}()
-    for t in 1:length(time)
+    for t = 1:length(time)
         # gen[t] is in the Pauli basis, rewrite in computational basis
         gen_canonical = changebasis(gen[t])
         # gen_canonical is an A-represention matrix of the quantum generator L,
@@ -247,9 +250,9 @@ function computeKs(dirdata::String; check=false)
         choimatrix = reshape(A2Bmatrix * vec(gen_canonical), (4, 4))
         # Kraus decomposition of the generator at time t
         eigvals, krausoperators = krausdecomposition(choimatrix)
-        if check 
+        if check
             push!(Ks, computeKs_check(eigvals, krausoperators))
-        else 
+        else
             push!(Ks, computeKs(eigvals, krausoperators))
         end
     end
@@ -413,7 +416,10 @@ function effective_freqs(dirdata::String, time::Vector{Float64})
     # specified time points, assuming all times in `time` 
     # exist in `Ks.time`.
     effective_hamiltonian = computeKs(dirdata)
-    inds = [findfirst(x -> isapprox(x, t; atol=1e-8), effective_hamiltonian.time) for t in time]
+    inds = [
+        findfirst(x -> isapprox(x, t; atol = 1e-8), effective_hamiltonian.time) for
+        t in time
+    ]
     Ks = effective_hamiltonian.Ks[inds]
     # Print error message if sliced `ks` length doesn't match
     # `time` lenght.

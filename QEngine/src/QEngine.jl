@@ -14,7 +14,7 @@ include("constants.jl")
 
 include("mps_spin_boson.jl")
 
-export  setup, loadconfig
+export setup, loadconfig
 include("setup.jl")
 
 export chain_coefficients, tomodynamics, envdynamics, get_measurements
