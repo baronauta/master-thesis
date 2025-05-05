@@ -5,6 +5,11 @@
 # - chain coefficients
 # ─────────────────────────────────────────────────────────────
 
+"""
+    sdf(filename::String)
+
+Compute the spectral density J(ω) over its domain from JSON parameters in `filename`.
+"""
 function sdf(filename::String)
     p = open(filename) do input
         JSON.parse(read(input, String))
@@ -20,29 +25,48 @@ function sdf(filename::String)
     return xs, ys
 end
 
+function boson_thermal_factor(x, T)
+    if T == 0
+        # In this case we could write f=1 and be done with it, but instead we choose
+        # this more articulated way so that even if the caller doesn't already
+        # exclude (-∞,0) from the support, we do it ourselves now.
+        f = x > 0 ? one(x) : zero(x)
+    else
+        f = 1 / 2 * (1 + coth(0.5 * x / T))
+    end
+    return f
+end
+
+"""
+    thermal_sdf(filename::String)
+
+Construct the thermal spectral density J_β(ω) at temperature T from JSON in `filename`.
+"""
 function thermal_sdf(filename::String)
     p = open(filename) do input
         JSON.parse(read(input, String))
     end
     a = Float64.(p["environment"]["spectral_density_parameters"])
     T = Float64(p["environment"]["temperature"])
-    if T == 0
-        println("ERROR: environment at zero temperature.")
-        return
-    end
     support = Float64.(p["environment"]["domain"])
     extended_support = (-support[2], support[2])
     fn = p["environment"]["spectral_density_function"]
     # Creating a callable function object tmp
     tmp = eval(Meta.parse("(a, x) -> " * fn))
-    f = x -> Base.invokelatest(tmp, a, x)
+    sdf = x -> Base.invokelatest(tmp, a, x)
     # Defining the extended function
-    thermal_f = x -> (1 / 2) * (1 + coth(0.5 * x / T)) * sign(x) * f(abs(x))
+    thermal_sdf(x) = boson_thermal_factor(x, T) * sign(x) * sdf(abs(x))
     xs = collect(range(extended_support..., 1000000))
-    ys = thermal_f.(xs)
+    ys = thermal_sdf.(xs)
     return xs, ys, a, T
 end
 
+"""
+    plot_sdf(filename::String)
+
+Plot the spectral density J(ω) from JSON file `filename`.
+Returns a `Figure`.
+"""
 function plot_sdf(filename::String)
     xs, ys = sdf(filename)
     # Create and display the plot
@@ -52,6 +76,12 @@ function plot_sdf(filename::String)
     f
 end
 
+"""
+    plot_thermal_sdf(filename::String) -> Figure
+
+Plot the thermal spectral density J_β(ω) with temperature and parameters annotated.
+Returns a `Figure`.
+"""
 function plot_thermal_sdf(filename::String)
     xs, ys, a, temp = thermal_sdf(filename)
     # Create and display the plot
@@ -62,6 +92,12 @@ function plot_thermal_sdf(filename::String)
     f
 end
 
+"""
+    plot_chain_coefficients(filename::String)
+
+Plot chain transformation frequencies and couplings from `filename` data.
+Returns a `Figure`.
+"""
 function plot_chain_coefficients(filename::String)
     coefficients = chain_coefficients(filename)
     f = Figure()
