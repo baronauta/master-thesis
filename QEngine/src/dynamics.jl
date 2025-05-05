@@ -9,6 +9,12 @@
 #
 # ─────────────────────────────────────────────────────────────
 
+"""
+    qmaptomography(dirdata::String)
+
+Performs quantum process tomography from measurement data in `dirdata`. 
+Returns a named tuple with the quantum map (`qmap`) and associated `time` vector.
+"""
 function qmaptomography(dirdata)
     # Load measurements and extract results
     meas_files = ["Up", "Dn", "+", "i"]
@@ -37,6 +43,12 @@ function qmaptomography(dirdata)
     return (qmap = qmap, time = time)
 end
 
+"""
+    qmap_to_gen(qmap::Vector{Matrix{ComplexF64}}, time::Vector{Float64})
+
+Computes the time-local generator `gen` from a time-dependent quantum map `qmap`, 
+using finite difference methods. Returns a named tuple with `gen` and `time`.
+"""
 function qmap_to_gen(qmap::Vector{Matrix{ComplexF64}}, time::Vector{Float64})
     # The generator L(t) is related to the dynamical map Φ(t)
     # by means of L(t) = dΦ/dt Φ^(-1).
@@ -109,6 +121,13 @@ function changebasis(Φ::Matrix{ComplexF64})
     return 1/2 * M' * Φ * M
 end
 
+"""
+    krausdecomposition(M::Matrix{ComplexF64}
+
+Computes the Kraus decomposition of a Hermitian superoperator.  
+Returns a tuple `(eigvals, krausoperators)`, where `eigvals` are the eigenvalues 
+and `krausoperators` are the corresponding Kraus operators.
+"""
 function krausdecomposition(M::Matrix{ComplexF64})
     # M is Hermitian ⇒ admits spectral decomposition:
     # i.e. there exists a unitary Q and real eigenvalues λₖ such that
@@ -142,12 +161,24 @@ end
 # - Internal energy Us(t) = Tr[Ks(t)ρs(t)]
 # ─────────────────────────────────────────────────────────────
 
+"""
+    computeKs(eigvals::Vector{Float64}, E::Vector{Matrix{ComplexF64}})
+
+Compute the effective hamiltonian Ks(t) of a time-local quantum generator from its Kraus decomposition
+for a given time. Returns a matrix.
+"""
 function computeKs(eigvals::Vector{Float64}, E::Vector{Matrix{ComplexF64}})
     total =
         sum([eigvals[k] * (tr(E[k]) * E[k]' - tr(E[k]') * E[k]) for k = 1:length(eigvals)])
     return -im / 4.0 * total
 end
 
+"""
+    computeKs(dirdata::String)
+
+Compute the effective hamiltonian Ks(t) of a time-local quantum generator from measurement data in `dirdata`.  
+Returns a named tuple with time-dependent matrices `Ks` and associated `time` vector.
+"""
 function computeKs(dirdata::String)
     # Map tomography: from data obtain the dynamical map Φ for every t in the Pauli basis.
     qmap = qmaptomography(dirdata)
@@ -194,7 +225,18 @@ end
 #     return Ks_check
 # end
 
+"""
+    computeUs(dirdata::String)
 
+Compute the real part of system-environment interaction energy for the "Up" initial state.
+
+# Arguments
+- `dirdata::String`: path to directory containing measurement and Hamiltonian data.
+
+# Returns
+- `Us`: vector of real interaction energies tr(Ks * ρs).
+- `time`: corresponding time points.
+"""
 function computeUs(dirdata::String)
     effective_hamiltonian = computeKs(dirdata)
     # Load ρs(t) for system prepared in the "Up" state
@@ -206,13 +248,19 @@ function computeUs(dirdata::String)
     return (Us = Us, time = ffective_hamiltonian.time)
 end
 
+"""
+    chain_occupation(dirdata::String)
 
-# ─────────────────────────────────────────────────────────────
-# Environment
-# - Occupation number of the chain modes
-# - Occupation number of the normal modes
-# ─────────────────────────────────────────────────────────────
+Extract occupation numbers of each site in the environment chain.
 
+# Arguments
+- `dirdata::String`: path to directory containing occupation measurements.
+
+# Returns
+- `ns`: matrix of occupation numbers; each row is referred to a different time.
+- `sites`: site indices.
+- `time`: array containing time of measurements.
+"""
 function chain_occupation(dirdata::String)
     meas = get_measurements(dirdata * "/measurements_N.dat", "N")
     # MPS of sys⊗env: environment sites from {2} to {NN+1}
@@ -225,16 +273,25 @@ function chain_occupation(dirdata::String)
     return (ns = data, sites = sites, time = meas.time)
 end
 
-function _normalmodes(filename::String; extdendN = false)
+"""
+Diagonalize extended chain Hamiltonian to obtain normal-mode frequencies and transformation matrix.
+
+# Arguments
+- `filename::String`: path to JSON config file.
+- `extdendN`: extend chain length for fictitious modes, default 500.
+
+# Returns
+- `D`: Diagonal matrix of mode frequencies.
+- `P`: Unitary transformation matrix (eigenvectors).
+"""
+function _normalmodes(filename::String; extdendN = 1000)
     # Chain Hamiltonian for the env is H_E = c† A c, where A is a tridiagonal matrix:
     # major diagonal formed by frequencies ωn (n = 0...N-1),
     # sub-diagonal and super-diagonal formed by couplings κn (n = 1...N-1).
     params = JSON.parsefile(filename)
     # I fictitiously enlarge the chain, see Riva et al.: PRB 108, 195138 (2023), Appendix E.
-    if extdendN == true
-        params["PolyChaos_nquad"] = 10000
-        params["chain_length"] = 5000
-    end
+    params["PolyChaos_nquad"] = 5000
+    params["chain_length"] = extdendN # <5000
     coeff = chain_coefficients(params)
     f = coeff.frequencies
     # Couplings κn with n = 0...N-1. But κ0, the one for the TLS-env interaction,
@@ -254,6 +311,16 @@ function _normalmodes(filename::String; extdendN = false)
     return D, P
 end
 
+"""
+    envmodes_occupation(dirdata::String)
+
+Compute occupation of environment normal modes and write to CSV.
+- Writes `envmodes_data.dat` with time and occupations.
+- Writes `envmodes_modes.dat` with mode frequencies.
+
+# Arguments
+- `dirdata::String`: path to directory for measurements and output.
+"""
 function envmodes_occupation(dirdata::String)
     # Measurements performed for each sites for each time in meas.time.
     # MPS of sys⊗env: environment sites from {2} to {N+1}
@@ -264,7 +331,7 @@ function envmodes_occupation(dirdata::String)
     # Compute chain coefficients and find normal modes.
     # Set extendN to `true` for computing normal modes for a longer chain
     # with NN modes.
-    D, P = _normalmodes(dirdata * "/config.json"; extdendN = true)
+    D, P = _normalmodes(dirdata * "/config.json")
     modes = diag(D)
     NN = length(modes)
     # The chain Hamiltonian of the environment is quadratic in b{i} 
@@ -303,5 +370,31 @@ function envmodes_occupation(dirdata::String)
             println(io, f)
         end
     end
+end
 
+"""
+    effective_freqs(dirdata::String, time::Vector{Float64})
+
+Compute frequency transitions ωₛ′ = (E₊ - E₋)/ħ from the effective Hamiltonian Kₛ at specified time points.
+"""
+function effective_freqs(dirdata::String, time::Vector{Float64})
+    # Compute Ks and align its values corresponding to the
+    # specified time points, assuming all times in `time` 
+    # exist in `Ks.time`.
+    effective_hamiltonian = computeKs(dirdata)
+    inds = [findfirst(x -> isapprox(x, t; atol=1e-8), effective_hamiltonian.time) for t in time]
+    Ks = effective_hamiltonian.Ks[inds]
+    # Print error message if sliced `ks` length doesn't match
+    # `time` lenght.
+    if length(Ks) !== length(time)
+        println("Error: time points mismatch!")
+        return 0
+    end
+    # Frequency transition of Ks (effective Hamiltonian):
+    # ωs' = (E+ - E-)/ħ with E± eigvals of Ks.
+    E = eigen.(Ks)
+    Eminus = [eig.values[1] for eig in E]
+    Eplus = [eig.values[2] for eig in E]
+    freqs = Eplus - Eminus
+    return freqs
 end
