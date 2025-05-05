@@ -22,10 +22,10 @@ function qmaptomography(dirdata)
         name => get_measurements(dirdata * "/measurements_$name.dat", "densitymatrix")
         for name in meas_files
     )
-    Up, Down, Plus, Trans = meas_data["Up"].result,
-    meas_data["Dn"].result,
-    meas_data["+"].result,
-    meas_data["i"].result
+    Up = meas_data["Up"].result
+    Down = meas_data["Dn"].result
+    Plus = meas_data["+"].result
+    Trans = meas_data["i"].result
     # Extract time (assumes all share the same timeline)
     time = meas_data["Up"].time
 
