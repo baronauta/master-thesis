@@ -155,21 +155,72 @@ function krausdecomposition(M::Matrix{ComplexF64})
     return eigvals, krausoperators
 end
 
-# ─────────────────────────────────────────────────────────────
-# Thermodynamics quantities
-# - Effective Hamiltonian Ks
-# - Internal energy Us(t) = Tr[Ks(t)ρs(t)]
-# ─────────────────────────────────────────────────────────────
+"""
+    dynamics_krausform(eigvals::Vector{Float64}, E::Vector{Matrix{ComplexF64}}, ρ::Matrix{ComplexF64}) -> Matrix{ComplexF64}
+
+Applies a quantum operation to a density matrix ρ using its Kraus decomposition.
+
+# Arguments
+- `eigvals`: Eigenvalues `λₖ` from the decomposition.
+- `E`: Kraus operators `Eₖ`.
+- `ρ`: Density matrix to which the operation is applied.
+
+# Returns
+The transformed density matrix under the Kraus form:
+
+    Φ(ρ) = ∑ₖ λₖ Eₖ ρ Eₖ†
+"""
+function dynamics_krausform(eigvals::Vector{Float64}, E::Vector{Matrix{ComplexF64}}, ρ::Matrix{ComplexF64})
+    sum([
+        eigvals[k] * E[k] * ρ * E[k]' for k in axes(eigvals, 1)
+    ])
+end
 
 """
     computeKs(eigvals::Vector{Float64}, E::Vector{Matrix{ComplexF64}})
 
-Compute the effective hamiltonian Ks(t) of a time-local quantum generator from its Kraus decomposition
-for a given time. Returns a matrix.
+Computes the effective Hamiltonian part Ks(t) of a time-local quantum generator at time t, 
+given its Kraus decomposition.
+
+# Arguments
+- `eigvals`: eigenvalues λₖ(t) from the Kraus decomposition of the generator.
+- `E`: matrix whose columns are the Kraus operators Eₖ(t).
+
+# Returns
+A `Matrix{ComplexF64}` representing the effective Hamiltonian `Ks(t)`, computed as:
+
+    Ks(t) = - (i/4) * ∑ₖ λₖ(t) [Tr(Eₖ) * Eₖ† − Tr(Eₖ†) * Eₖ].
 """
 function computeKs(eigvals::Vector{Float64}, E::Vector{Matrix{ComplexF64}})
     total =
         sum([eigvals[k] * (tr(E[k]) * E[k]' - tr(E[k]') * E[k]) for k = 1:length(eigvals)])
+    return -im / 4.0 * total
+end
+
+"""
+    computeKs_check(eigvals::Vector{Float64}, E::Vector{Matrix{ComplexF64}})
+
+Alternative method to compute the effective Hamiltonian part Ks(t) of a time-local quantum generator 
+using its action on a canonical operator basis.
+
+# Arguments
+- `eigvals`: Eigenvalues `λₖ` from the Kraus decomposition.
+- `E`: Kraus operators `Eₖ`.
+
+# Returns
+A `Matrix{ComplexF64}` representing the effective Hamiltonian `Ks(t)`, computed via:
+
+    Ks(t) = - (i/4) * ∑ₐ [ τₐ† * S(τₐ) − S(τₐ) * τₐ† ]
+
+where `S(·)` is the superoperator defined by the Kraus decomposition, and `{τₐ}` is the canonical operator basis.
+"""
+function computeKs_check(eigvals::Vector{Float64}, E::Vector{Matrix{ComplexF64}})
+    total = 
+        sum([
+            canonical_op_basis[a]' * dynamics_krausform(E, eigvals, canonical_op_basis[a]) -
+                dynamics_krausform(E, eigvals, canonical_op_basis[a]) * canonical_op_basis[a]' for
+                a in axes(canonical_op_basis, 1)
+        ])
     return -im / 4.0 * total
 end
 
@@ -179,7 +230,7 @@ end
 Compute the effective hamiltonian Ks(t) of a time-local quantum generator from measurement data in `dirdata`.  
 Returns a named tuple with time-dependent matrices `Ks` and associated `time` vector.
 """
-function computeKs(dirdata::String)
+function computeKs(dirdata::String; check=false)
     # Map tomography: from data obtain the dynamical map Φ for every t in the Pauli basis.
     qmap = qmaptomography(dirdata)
     # Change dynamics description from dynamical map Φ to generator L = dΦ/dt Φ^(-1).
@@ -196,34 +247,14 @@ function computeKs(dirdata::String)
         choimatrix = reshape(A2Bmatrix * vec(gen_canonical), (4, 4))
         # Kraus decomposition of the generator at time t
         eigvals, krausoperators = krausdecomposition(choimatrix)
-        push!(Ks, computeKs(eigvals, krausoperators))
+        if check 
+            push!(Ks, computeKs_check(eigvals, krausoperators))
+        else 
+            push!(Ks, computeKs(eigvals, krausoperators))
+        end
     end
     return (Ks = Ks, time = time)
 end
-
-# function effective_hamiltonian_check(map_tomo_path)
-
-#     config = load_system_config(dirdata * "/config.JSON")
-#     # compute the map and its qmap_to_gen
-#     qmap = qmaptomography(map_tomo_path)
-#     myGen = qmap_to_gen(qmap, config.dt)
-#     # choi matrix of the qmap_to_gen and then kraus decomposition
-#     choi_eigvals, EE = kraus_decomposition(myGen)
-#     # effective hamiltonian
-#     Ks_check = Vector{Matrix{ComplexF64}}()
-#     # push iniziale con Ks al tempo zero?
-#     for t in axes(EE, 1)
-#         push!(
-#             Ks_check,
-#             -im / 4.0 * sum([
-#                 canonical_op_basis[a]' * kraus_term(EE[t], choi_eigvals[t], canonical_op_basis[a]) -
-#                 kraus_term(EE[t], choi_eigvals[t], canonical_op_basis[a]) * canonical_op_basis[a]' for
-#                 a in axes(canonical_op_basis, 1)
-#             ]),
-#         )
-#     end
-#     return Ks_check
-# end
 
 """
     computeUs(dirdata::String)
@@ -284,14 +315,14 @@ Diagonalize extended chain Hamiltonian to obtain normal-mode frequencies and tra
 - `D`: Diagonal matrix of mode frequencies.
 - `P`: Unitary transformation matrix (eigenvectors).
 """
-function _normalmodes(filename::String; extdendN = 1000)
+function _normalmodes(filename::String; extdendN = 500)
     # Chain Hamiltonian for the env is H_E = c† A c, where A is a tridiagonal matrix:
     # major diagonal formed by frequencies ωn (n = 0...N-1),
     # sub-diagonal and super-diagonal formed by couplings κn (n = 1...N-1).
     params = JSON.parsefile(filename)
     # I fictitiously enlarge the chain, see Riva et al.: PRB 108, 195138 (2023), Appendix E.
     params["PolyChaos_nquad"] = 5000
-    params["chain_length"] = extdendN # <5000
+    params["chain_length"] = extdendN # < PolyChaos_nquad
     coeff = chain_coefficients(params)
     f = coeff.frequencies
     # Couplings κn with n = 0...N-1. But κ0, the one for the TLS-env interaction,
@@ -329,9 +360,9 @@ function envmodes_occupation(dirdata::String)
     # i.e <b†{i}b{i}> = meas["N{i}_re"] with i from 2 to N+1.
     meas = get_measurements(dirdata * "/measurements_N.dat", "N")
     # Compute chain coefficients and find normal modes.
-    # Set extendN to `true` for computing normal modes for a longer chain
+    # Choose extendN for computing normal modes for a longer chain
     # with NN modes.
-    D, P = _normalmodes(dirdata * "/config.json")
+    D, P = _normalmodes(dirdata * "/config.json"; extdendN = 500)
     modes = diag(D)
     NN = length(modes)
     # The chain Hamiltonian of the environment is quadratic in b{i} 
