@@ -5,7 +5,6 @@
 myscript
 script.sh
 
-data
+data*
 misc
-modes
 runs
