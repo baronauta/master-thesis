@@ -60,7 +60,9 @@ function save_tedopa_coefficients(coefficients, save_to_dir)
 end
 
 # ─────────────────────────────────────────────────────────────
-# Simulation
+# Using TDVP technique
+#   - dynamics of tomographic basis
+#   - dynamics of a state and environment 
 # ─────────────────────────────────────────────────────────────
 
 """
@@ -106,7 +108,7 @@ function tomodynamics(filename::String; tomoStates = ["Up", "Dn", "+", "i"])
         psi0ext = growMPS(psi0, config.grow_mps)[1]
 
         # Calculate tmax from tΔ/π: tmax = tΔ/π * π/Δ
-        tmax = config.t_Delta_over_pi * π / config.Delta
+        tmax = config.tmax
 
         # Run TDVP1
         tmpfile = tempname()
@@ -135,7 +137,7 @@ end
 # Arguments
 - `filename::String`: Path to the JSON configuration file.
 """
-function envdynamics(filename)
+function envdynamics(filename; initial_state="Up")
     config = loadconfig(filename)
     # Compute TEDOPA or T-TEDOPA coefficients according to temperature T
     coefficients = chain_coefficients(filename)
@@ -144,33 +146,38 @@ function envdynamics(filename)
     dir = dirname(filename)
     freqs_file, coups_file = save_tedopa_coefficients(coefficients, dir)
 
-    # MPS of the initial state of the composite system TLS⊗bath;
-    # consider the TLS to be in the "Up" state.
+    # MPS of the initial state of the composite system TLS⊗bath
     (sysenv, psi0) = defineSystem(
         sys_type = "S=1/2",
-        sys_istate = "Up",
+        sys_istate = initial_state,
         chain_length = config.chain_length,
         local_dim = config.local_dim,
     )
     # MPO of the Hamiltonian H = H_S + H_E + H_I
     H = createMPO(sysenv, config.epsilon, config.Delta, "Sz", freqs_file, coups_file)
 
-    # Measure the ProjUp observable on the first site of the MPS, i.e. the one for the TLS.
+    # Measure the observables on the first site of the MPS, i.e. the one for the TLS.
     # Measure N on each site of the chain: these are the ones from 2 to chain_length + 1.
-    operators = [LocalOperator(Dict(1 => "ProjUp"))]
+    operators = [
+        LocalOperator(Dict(1 => "Sx")),
+        LocalOperator(Dict(1 => "iSy")),
+        LocalOperator(Dict(1 => "Sz")),
+    ]
     for i = 2:config.chain_length+1
         push!(operators, LocalOperator(Dict(i => "N")))
     end
-    # Measurements are performed every n integration steps to reduce computational cost. 
-    # This lower resolution is sufficient for the plots while speeding up the simulation.
-    dtmeas = 10 * config.dt
+    # # Measurements are performed every n integration steps to reduce computational cost. 
+    # # This lower resolution is sufficient for the plots while speeding up the simulation.
+    # dtmeas = 10 * config.dt
+    # Measurements performed at every integration step during the simulation
+    dtmeas = config.dt
     cb = ExpValueCallback(operators, sysenv, dtmeas)
 
     # Increase manually the bond dimension of the initial state (which is factorized, so that χ=1 on all bonds)
     psi0ext = growMPS(psi0, config.grow_mps)[1]
 
     # Calculate tmax from tΔ/π: tmax = tΔ/π * π/Δ
-    tmax = config.t_Delta_over_pi * π / config.Delta
+    tmax = config.tmax
 
     # Run TDVP1
     tmpfile = tempname()

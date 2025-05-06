@@ -23,21 +23,20 @@
 # ─────────────────────────────────────────────────────────────
 
 """
-    plot_chain_occupation(dirdata::String, t_scaled::Real)
+    plot_chain_occupation(dirdata::String, t::Real)
 
-Plot the chain site occupations ⟨nᵢ⟩ at a given scaled time `t_scaled` using data from `dirdata`.
+Plot the chain site occupations ⟨nᵢ⟩ at a given scaled time `t` using data from `dirdata`.
 """
-function plot_chain_occupation(dirdata::String, t_scaled::Real)
+function plot_chain_occupation(dirdata::String, t::Real)
     # Collect data
     data = chain_occupation(dirdata)
     sites = data.sites
     ns = data.ns
-    # Time scaled by Δ / π (for labels)
-    config = loadconfig(dirdata * "/config.json")
-    ts = _scalets(data.time, config.Delta)
+    # Time (for labels)
+    ts = data.time
 
-    # Find the index of the closest ts to t_scaled
-    diffs = abs.(ts .- t_scaled)
+    # Find the index of the closest ts to `t`
+    diffs = abs.(ts .- t)
     t_idx = argmin(diffs)  # index of closest time
 
     # Extract corresponding values
@@ -60,11 +59,11 @@ function plot_chain_occupation(dirdata::String, t_scaled::Real)
 end
 
 """
-    plot_envmodes_occupation(dirdata::String, t_scaled::Real)
+    plot_envmodes_occupation(dirdata::String, t::Real)
 
-Plot environment mode occupations ⟨n_ω⟩ at a given scaled time `t_scaled`, with spectral density and frequency transitions.
+Plot environment mode occupations ⟨n_ω⟩ at a given scaled time `t`, with spectral density and frequency transitions.
 """
-function plot_envmodes_occupation(dirdata::String, t_scaled::Real)
+function plot_envmodes_occupation(dirdata::String, t::Real)
     # Collect data
     (rawdata, header) = readdlm("$dirdata/envmodes_data.dat", ',', Float64, header = true)
     meastime = rawdata[:, 1]
@@ -83,12 +82,11 @@ function plot_envmodes_occupation(dirdata::String, t_scaled::Real)
     # ωs' = (E+ - E-)/ħ with E± eigvals of Ks.
     freqs = _effective_freqs(dirdata, meastime)
 
-    # Time scaled by Δ / π (for labels)
-    config = loadconfig(dirdata * "/config.json")
-    ts = _scalets(data.time, config.Delta)
+    # Time (for labels)
+    ts = data.time
 
-    # Find the index of the closest ts to t_scaled
-    diffs = abs.(ts .- t_scaled)
+    # Find the index of the closest ts to `t`
+    diffs = abs.(ts .- t)
     t_idx = argmin(diffs)  # index of closest time
 
     # Extract corresponding values
@@ -150,8 +148,8 @@ function plot_transitionfreqs(dirdata::String; tmax = nothing)
     meastime = rawdata[:, 1]
     freqs_Ks = effective_freqs(dirdata, meastime)
 
-    # xs: time scaled by Δ / π
-    ts = _scalets(meastime, config.Delta)
+    # xs: time
+    ts = meastime
 
     if tmax !== nothing
         # Shorten time domain
@@ -215,9 +213,8 @@ function animate_chain_occupation(dirdata::String, outdir::String)
     data = chain_occupation(dirdata)
     sites = data.sites
     ns = data.ns
-    # Time scaled by Δ / π (for labels)
-    config = loadconfig(dirdata * "/config.json")
-    ts = round.(_scalets(data.time, config.Delta), digits = 1)
+    # Time
+    ts = round.(data.time, digits = 1)
     # Stepping function that returns the new data, here simply
     # progress the index `i`.
     function progress_for_one_step!(i, ns, ts)
@@ -286,9 +283,8 @@ function animate_envmodes_occupation(
     ns = rawdata[:, 2:end]
     (rawdata, header) = readdlm("$dirdata/envmodes_modes.dat", ',', Float64, header = true)
     modes = rawdata[:]
-    # Time scaled by Δ / π (for labels)
-    config = loadconfig(dirdata * "/config.json")
-    ts = round.(_scalets(meastime, config.Delta), digits = 1)
+    # Time
+    ts = round.(data.time, digits = 1)
     # Thermalized spectral density function for reference
     sdfx, sdfy = thermal_sdf(dirdata * "/config.json")
     # Frequency transition for Hs (bare system Hamiltonian):

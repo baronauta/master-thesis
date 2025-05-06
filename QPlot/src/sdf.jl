@@ -6,25 +6,33 @@
 # ─────────────────────────────────────────────────────────────
 
 """
-    sdf(filename::String)
+    plot_sdf(filename::String)
 
-Compute the spectral density J(ω) over its domain from JSON parameters in `filename`.
+Plot the spectral density J(ω) from JSON file `filename`.
+Returns a `Figure`.
 """
-function sdf(filename::String)
+function plot_sdf(filename::String)
+    # Parse filename with sdf paramters
     p = open(filename) do input
         JSON.parse(read(input, String))
     end
+    # Read a and support
     a = Float64.(p["environment"]["spectral_density_parameters"])
     support = Float64.(p["environment"]["domain"])
+    # Create and a callable object to compute sdf
     fn = p["environment"]["spectral_density_function"]
-    # Creating a callable function object tmp
     tmp = eval(Meta.parse("(a, x) -> " * fn))
-    f = x -> Base.invokelatest(tmp, a, x)
+    sdf = x -> Base.invokelatest(tmp, a, x)
+
+    f = Figure()
     xs = collect(range(support..., 1000))
-    ys = f.(xs)
-    return xs, ys
+    ys = sdf.(xs)
+    ax = Axis(f[1, 1], xlabel = L"\omega", ylabel = L"J(\omega)")
+    lines!(ax, xs, ys)
+    f
 end
 
+"Copied from pharrex repository."
 function boson_thermal_factor(x, T)
     if T == 0
         # In this case we could write f=1 and be done with it, but instead we choose
@@ -38,54 +46,30 @@ function boson_thermal_factor(x, T)
 end
 
 """
-    thermal_sdf(filename::String)
-
-Construct the thermal spectral density J_β(ω) at temperature T from JSON in `filename`.
-"""
-function thermal_sdf(filename::String)
-    p = open(filename) do input
-        JSON.parse(read(input, String))
-    end
-    a = Float64.(p["environment"]["spectral_density_parameters"])
-    T = Float64(p["environment"]["temperature"])
-    support = Float64.(p["environment"]["domain"])
-    extended_support = (-support[2], support[2])
-    fn = p["environment"]["spectral_density_function"]
-    # Creating a callable function object tmp
-    tmp = eval(Meta.parse("(a, x) -> " * fn))
-    sdf = x -> Base.invokelatest(tmp, a, x)
-    # Defining the extended function
-    thermal_sdf(x) = boson_thermal_factor(x, T) * sign(x) * sdf(abs(x))
-    xs = collect(range(extended_support..., 1000000))
-    ys = thermal_sdf.(xs)
-    return xs, ys, a, T
-end
-
-"""
-    plot_sdf(filename::String)
-
-Plot the spectral density J(ω) from JSON file `filename`.
-Returns a `Figure`.
-"""
-function plot_sdf(filename::String)
-    xs, ys = sdf(filename)
-    # Create and display the plot
-    f = Figure()
-    ax = Axis(f[1, 1], xlabel = L"\omega", ylabel = L"J(\omega)")
-    lines!(ax, xs, ys)
-    f
-end
-
-"""
     plot_thermal_sdf(filename::String) -> Figure
 
 Plot the thermal spectral density J_β(ω) with temperature and parameters annotated.
 Returns a `Figure`.
 """
 function plot_thermal_sdf(filename::String)
-    xs, ys, a, temp = thermal_sdf(filename)
-    # Create and display the plot
+    # Parse filename with sdf paramters
+    p = open(filename) do input
+        JSON.parse(read(input, String))
+    end
+    # Read a and support
+    a = Float64.(p["environment"]["spectral_density_parameters"])
+    support = Float64.(p["environment"]["domain"])
+    therm_support = [-support[2], support[2]]
+    # Create a callable object to compute sdf
+    fn = p["environment"]["spectral_density_function"]
+    tmp = eval(Meta.parse("(a, x) -> " * fn))
+    sdf = x -> Base.invokelatest(tmp, a, x)
+    # Defining the thermalized sdf
+    therm_sdf(x) = boson_thermal_factor(x, T) * sign(x) * sdf(abs(x))
+
     f = Figure()
+    xs = collect(range(therm_support..., 1000000))
+    ys = therm_sdf.(xs)
     ax = Axis(f[1, 1], xlabel = L"\omega", ylabel = L"J_\beta(\omega)")
     lines!(ax, xs, ys, label = L"T=%$(temp),\,\alpha=%$(a[1]),\,s=%$(a[3])")
     axislegend(position = :rt)

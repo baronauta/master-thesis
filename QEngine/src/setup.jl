@@ -22,13 +22,13 @@ function setup(dirname::String)
     epsilon, Delta = _input_tls_parameters()
 
     println("\n=== SPECTRAL DENSITY FUNCTION SETUP ===")
-    sdf, a = _input_spectral_density(epsilon, Delta)
+    sdf, a = _input_ohmic_spectral_density(epsilon, Delta)
 
     println("\n=== ENVIRONMENT SETUP ===")
     domain, temp, chain_length = _input_environment()
 
     println("\n=== SIMULATION SETTINGS ===")
-    t_Delta, local_dim, grow_mps = _input_simulation_settings()
+    tmax, local_dim, grow_mps = _input_simulation_settings()
 
     data = Dict(
         "environment" => Dict(
@@ -43,7 +43,7 @@ function setup(dirname::String)
         "simulation" => Dict(
             "dt" => nothing,
             "local_dim" => local_dim,
-            "t_Delta_over_pi" => t_Delta,
+            "tmax" => tmax,
             "grow_mps" => grow_mps,
         ),
     )
@@ -63,43 +63,18 @@ function _input_tls_parameters()
     return epsilon, Delta
 end
 
-function _input_spectral_density(epsilon, Delta)
-    println("You can enter a custom expression, e.g. pi/2 * a[1] * x * exp(-x/a[2]).")
-    println(
-        "Note: 'a' is a parameter array that you will be asked to provide in the next step.",
-    )
-    println("Or use a predefined model by name: ohmic.")
-    print("Enter spectral density function: ")
-    sdf = readline()
-
-    if sdf == "ohmic"
-        sdf, a = _handle_predefined_ohmic(epsilon, Delta)
-    else
-        println("→ Using custom spectral density function:\n  $sdf")
-        print(
-            "Enter spectral density parameters as comma-separated values (e.g., 0.1,1.0,...): ",
-        )
-        a = parse.(Float64, split(readline(), ","))
-    end
-    return sdf, a
-end
-
-function _handle_predefined_ohmic(epsilon, Delta)
+function input_ohmic_spectral_density(epsilon, Delta)
     sdf = "pi/2 * a[1] * x^(a[3]) / a[2]^(a[3]-1) * exp(-x/a[2])"
-    println("→ Using predefined ohmic spectral density:")
+    println("→ Using ohmic spectral density:")
     println("  $sdf\n  a[1] (α), a[2] (ωc), a[3] (s)")
-    print(
-        "Enter the spectral density parameters as comma-separated values (e.g. 0.1,1.0,1.0): ",
-    )
+    print("Enter the spectral density parameters as comma-separated values (e.g. 0.1,1.0,1.0): ")
     a = parse.(Float64, split(readline(), ","))
-    println("Possible rescaling: α → α / (ωₛ)^s. Dou want to apply? [Y/N]")
+
+    println("Possible rescaling: α → α / (ωₛ)ˢ. Do you want to apply? [Y/N]")
     scale = readline()
     if scale == "Y"
-        # Rescaling of α with the frequency value of the system.
-        # For the considered TLS: ωs = (E+ - E-)/ħ, 
-        # where E± eigvals of Hs, is 2√(ϵ^2+Δ^2).
-        ωs = 2 * sqrt(epsilon^2 + Delta^2)
-        a[1] /= ωs^a[3]
+        ω = 2 * sqrt(epsilon^2 + Delta^2)
+        a[1] = a[1] / ω^a[3]
         println("→ Rescaling applied.")
     elseif scale == "N"
         println("→ No rescaling.")
@@ -125,7 +100,7 @@ function _input_environment()
 end
 
 function _input_simulation_settings()
-    print("Enter total simulation time (in units of tΔ/π): ")
+    print("Enter total simulation time (in units of ωc): ")
     t_Delta = parse(Float64, readline())
 
     print("Enter local Hilbert space dimension per environment site: ")
@@ -135,6 +110,29 @@ function _input_simulation_settings()
     grow_mps = parse(Int, readline())
 
     return t_Delta, local_dim, grow_mps
+end
+
+"""
+    _suggest_params(parameters::Dict{<:AbstractString, Any})
+
+Calculates suggested time step (`dt`) and chain length (`N`) based on input parameters.
+"""
+function _suggest_params(parameters::Dict{<:AbstractString,Any})
+    # Extract necessary coefficients for parameter calculations
+    coefficients = chain_coefficients(parameters)
+    k∞ = coefficients.couplings[end] # Asymptotic coupling coefficient
+
+    # Rule-of-thumb formulas to determine the optimal chain_length and time step dt:
+    # - dt = 1 / (k∞ * 50)
+    # - N = 2 * k∞ * tmax
+
+    # Suggested time step (dt)
+    dt = round(1 / (k∞ * 50), sigdigits = 1, base = 10)
+    # Suggested chain length N
+    tmax = parameters["simulation"]["tmax"]
+    N = round(Int, 2 * k∞ * tmax)
+
+    return dt, N
 end
 
 function _apply_suggestions!(data)
@@ -170,33 +168,6 @@ function _save_config(dirname::String, data::Dict)
 end
 
 """
-    _suggest_params(parameters::Dict{<:AbstractString, Any})
-
-Calculates suggested time step (`dt`) and chain length (`N`) based on input parameters.
-"""
-function _suggest_params(parameters::Dict{<:AbstractString,Any})
-    # Extract necessary coefficients for parameter calculations
-    coefficients = chain_coefficients(parameters)
-    k∞ = coefficients.couplings[end] # Asymptotic coupling coefficient
-
-    # Rule-of-thumb formulas to determine the optimal chain_length and time step dt:
-    # - dt = 1 / (k∞ * 50)
-    # - N = 2 * k∞ * tmax
-
-    # Suggested time step (dt)
-    dt = round(1 / (k∞ * 50), sigdigits = 1, base = 10)
-
-    # Maximum simulation time in seconds unit
-    Delta = parameters["TLS"]["Delta"]
-    t_Delta_over_pi = parameters["simulation"]["t_Delta_over_pi"]
-    tmax = t_Delta_over_pi * π / Delta
-    # Suggested chain length N
-    N = round(Int, 2 * k∞ * tmax)
-
-    return dt, N
-end
-
-"""
     loadconfig(filename::String) -> NamedTuple
 
 Load system and simulation parameters from a JSON configuration file.
@@ -209,7 +180,7 @@ function loadconfig(filename::String)
         epsilon = config["TLS"]["epsilon"],
         Delta = config["TLS"]["Delta"],
         dt = config["simulation"]["dt"],
-        t_Delta_over_pi = config["simulation"]["t_Delta_over_pi"],
+        tmax = config["simulation"]["tmax"],
         grow_mps = config["simulation"]["grow_mps"],
         local_dim = config["simulation"]["local_dim"],
         domain = config["environment"]["domain"],

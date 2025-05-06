@@ -9,12 +9,17 @@
 #
 # ─────────────────────────────────────────────────────────────
 
-function horrendus_filtering!(qmap::Matrix{ComplexF64})
-    M = [ 1 1 0 0; 
+function horrendus_filtering(qmap::Matrix{ComplexF64})
+    eps = 1e-10
+    A = [ 1 1 1 1; 
           1 1 0 0; 
           0 0 1 1; 
           0 0 1 1]
-    qmap = qmap .* M
+    B = [ 0 0 0 0; 
+          0 0 eps eps; 
+          eps eps 0 0; 
+          eps eps 0 0]
+    return A .* qmap .+ B
 end
 
 """
@@ -47,7 +52,7 @@ function qmaptomography(dirdata::String)
     end
     qmap = [reshape(q, 4, 4) for q in qmap]
 
-    horrendus_filtering!.(qmap)
+    # qmap = horrendus_filtering.(qmap)
 
     # Return results as named tuple
     return (qmap = qmap, time = time)
