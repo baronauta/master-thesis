@@ -281,7 +281,11 @@ function animate_envmodes_occupation(dirdata::String, outdir::String)
     meastime = rawdata[:, 1]
     ts = round.(meastime, digits = 1)
     ns = rawdata[:, 2:end]
-    ns_max =  maximum(ns)
+    # Find the maximum in the inner region (no finite-domain effects)
+    ncols = size(ns, 2)
+    margin = round(Int, 0.001 * ncols)
+    inner_ns = ns[:, margin+1:end-margin]
+    ns_max = maximum(inner_ns)
     # Thermalized spectral density function for reference
     sdfx = collect(range(config.domain..., 1000))
     sdfy = [thermal_ohmic_sdf(x, SpectralDensityParams(config.a[1], config.a[3], config.a[2]), config.temperature) for x in sdfx]
@@ -325,9 +329,10 @@ function animate_envmodes_occupation(dirdata::String, outdir::String)
     # Set y-axis limits: consider `ns_max =  maximum(ns)`
     ylims!(ax, 0, ns_max * 11/10) # add 10% for better visibility
     # Set x-axis limits: use provided values or auto-trim 10% at each end to reduce edge artifacts
-    xmin, xmax = minimum(xs), maximum(xs)
-    dx = xmax - xmin
-    xlims!(ax, xmin + 0.01*dx, xmax - 0.01*dx)
+    # xmin, xmax = minimum(xs), maximum(xs)
+    # dx = xmax - xmin
+    # xlims!(ax, xmin + 0.01*dx, xmax - 0.01*dx)
+    xlims!(ax, -1, 1)
 
     lines!(
         ax,

@@ -7,6 +7,7 @@ using LinearAlgebra
 using JSON
 using QEngine
 
+export compare_sdf
 include("sdf.jl")
 
 export plot_state, plot_tomo_trdistance, plot_Ks
