@@ -30,7 +30,7 @@ function savefigs(dirdata::String)
     save("$outdir/Ks01.png", plot_Ks(dirdata, 0, 1))
     save("$outdir/Ks11.png", plot_Ks(dirdata, 1, 1))
     save("$outdir/trans_freqs.png", plot_transitionfreqs(dirdata))
- 
+
     animate_chain_occupation(dirdata, outdir)
     animate_envmodes_occupation(dirdata, outdir)
 end

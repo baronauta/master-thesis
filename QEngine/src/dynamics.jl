@@ -11,14 +11,18 @@
 
 function horrendus_filtering(qmap::Matrix{ComplexF64})
     eps = 1e-10
-    A = [ 1 1 1 1; 
-          1 1 0 0; 
-          0 0 1 1; 
-          0 0 1 1]
-    B = [ 0 0 0 0; 
-          0 0 eps eps; 
-          eps eps 0 0; 
-          eps eps 0 0]
+    A = [
+        1 1 1 1
+        1 1 0 0
+        0 0 1 1
+        0 0 1 1
+    ]
+    B = [
+        0 0 0 0
+        0 0 eps eps
+        eps eps 0 0
+        eps eps 0 0
+    ]
     return A .* qmap .+ B
 end
 
@@ -372,7 +376,7 @@ Compute occupation of environment normal modes and write to CSV.
 # Arguments
 - `dirdata::String`: path to directory for measurements and output.
 """
-function envmodes_occupation(dirdata::String; NN = 700, nframes=10000)
+function envmodes_occupation(dirdata::String; NN = 700, nframes = 10000)
     # Any Hermitian (here also real) matrix can be diagonalized by a unitary matrix.
     #   A = U D Uᵀ,
     # with D being a diagonal matrix and U  being unitary matrix, Uᵀ=U⁻¹=U†.
@@ -387,7 +391,7 @@ function envmodes_occupation(dirdata::String; NN = 700, nframes=10000)
     #   Hₑ = t† D t, with t:=Uc, t†:=c†U†
     # Occupation number of the new modes: 
     #   <tₙ† tₙ> = ∑k U[k,n]^2 * <cₖ† cₖ†>, with k = 0,...,N-1.
-    
+
     # MPS of sys⊗env: environment sites from {2} to {N+1}
     # <cⱼ† cⱼ> = meas["N{i}_re"] with i from 2 to N+1,
     # <cⱼ† cⱼ> = 0 with i from N+2 to NN+1
@@ -395,7 +399,7 @@ function envmodes_occupation(dirdata::String; NN = 700, nframes=10000)
     c_values = [get(meas.result, "N{$i}_re", zeros(length(meas.time))) for i = 2:NN+1]
 
     # Precompute U^2 values (squared coefficients for each mode)
-    U_squared = [U[k,n]^2 for k = 1:NN, n = 1:NN]
+    U_squared = [U[k, n]^2 for k = 1:NN, n = 1:NN]
 
     # Set time step indices for animation
     T = length(meas.time)
@@ -404,9 +408,7 @@ function envmodes_occupation(dirdata::String; NN = 700, nframes=10000)
     # Compute occupation numbers
     data = Vector{Vector{Float64}}()
     for t in timesampled_indices
-        t_values = [
-            sum(U_squared[k, n] * c_values[k][t] for k = 1:NN) for n = 1:NN
-        ]
+        t_values = [sum(U_squared[k, n] * c_values[k][t] for k = 1:NN) for n = 1:NN]
         push!(data, t_values)
     end
 

@@ -14,7 +14,8 @@ include("constants.jl")
 
 include("mps_spin_boson.jl")
 
-export chain_coefficients, suggest_dt_N, loadconfig, tomodynamics, sysenv_dynamics, get_measurements
+export chain_coefficients,
+    suggest_dt_N, loadconfig, tomodynamics, sysenv_dynamics, get_measurements
 include("simulation.jl")
 
 export computeKs, computeUs, chain_occupation, envmodes_occupation, effective_freqs

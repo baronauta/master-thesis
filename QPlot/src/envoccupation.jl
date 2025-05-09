@@ -208,7 +208,7 @@ end
 # ─────────────────────────────────────────────────────────────
 
 function animate_chain_occupation(dirdata::String, outdir::String)
-    config = loadconfig(dirdata*"/config.JSON")
+    config = loadconfig(dirdata * "/config.JSON")
     # 1. Collect data
     data = chain_occupation(dirdata)
     sites = data.sites
@@ -288,7 +288,13 @@ function animate_envmodes_occupation(dirdata::String, outdir::String)
     ns_max = maximum(inner_ns)
     # Thermalized spectral density function for reference
     sdfx = collect(range(config.domain..., 1000))
-    sdfy = [thermal_ohmic_sdf(x, SpectralDensityParams(config.a[1], config.a[3], config.a[2]), config.temperature) for x in sdfx]
+    sdfy = [
+        thermal_ohmic_sdf(
+            x,
+            SpectralDensityParams(config.a[1], config.a[3], config.a[2]),
+            config.temperature,
+        ) for x in sdfx
+    ]
     sdfy = sdfy ./ maximum(sdfy) .* 1 / 10 * ns_max # rescale sdf (it is just for reference)
     # Frequency transition for Hs (bare system Hamiltonian):
     # Hs = ϵ σz + Δ σx → E± = √(ϵ^2+Δ^2) eigvals of Hs,
@@ -327,7 +333,7 @@ function animate_envmodes_occupation(dirdata::String, outdir::String)
     )
 
     # Set y-axis limits: consider `ns_max =  maximum(ns)`
-    ylims!(ax, 0, ns_max * 11/10) # add 10% for better visibility
+    ylims!(ax, 0, ns_max * 11 / 10) # add 10% for better visibility
     # Set x-axis limits: use provided values or auto-trim 10% at each end to reduce edge artifacts
     # xmin, xmax = minimum(xs), maximum(xs)
     # dx = xmax - xmin

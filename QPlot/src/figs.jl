@@ -93,7 +93,7 @@ end
 
 function plot_Ks(dirdata::String, row_idx, col_idx; tmax = nothing)
     effective_hamiltonian = computeKs(dirdata::String)
-    config = loadconfig(dirdata*"/config.JSON")
+    config = loadconfig(dirdata * "/config.JSON")
     # xs: time 
     ts = effective_hamiltonian.time
     # ys: Real and Imag part of Effective Hamiltonian Ks
