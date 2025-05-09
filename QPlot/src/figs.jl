@@ -23,7 +23,7 @@ function plot_state(dirdata; state = "Up")
     meas = get_measurements(dirdata * file[state], "densitymatrix")
     measnorm = get_measurements(dirdata * file[state], "norm")
     # xs: time 
-    xs = meas.time
+    ts = meas.time
     # ys: density Matrix
     rho = meas.result
 
@@ -57,7 +57,7 @@ function plot_tomo_trdistance(dirdata)
     measTrans = get_measurements(dirdata * "/measurements_i.dat", "densitymatrix")
 
     # xs: time 
-    xs = meas.time
+    ts = measUp.time
 
     # ys: density Matrix
     Up = measUp.result
@@ -74,12 +74,12 @@ function plot_tomo_trdistance(dirdata)
     ylims!(ax, 0, 1)
 
     # Plot the trace distances
-    lines!(ax, ts_scaled, _trace_distance.(Up, Down), label = L"\text{d(Up,Down)}")
-    lines!(ax, ts_scaled, _trace_distance.(Up, Plus), label = L"\text{d(Up,Plus)}")
-    lines!(ax, ts_scaled, _trace_distance.(Up, Trans), label = L"\text{d(Up,Trans)}")
-    lines!(ax, ts_scaled, _trace_distance.(Down, Plus), label = L"\text{d(Down,Plus)}")
-    lines!(ax, ts_scaled, _trace_distance.(Down, Trans), label = L"\text{d(Down,Trans)}")
-    lines!(ax, ts_scaled, _trace_distance.(Plus, Trans), label = L"\text{d(Plus,Trans)}")
+    lines!(ax, ts, _trace_distance.(Up, Down), label = L"\text{d(Up,Down)}")
+    lines!(ax, ts, _trace_distance.(Up, Plus), label = L"\text{d(Up,Plus)}")
+    lines!(ax, ts, _trace_distance.(Up, Trans), label = L"\text{d(Up,Trans)}")
+    lines!(ax, ts, _trace_distance.(Down, Plus), label = L"\text{d(Down,Plus)}")
+    lines!(ax, ts, _trace_distance.(Down, Trans), label = L"\text{d(Down,Trans)}")
+    lines!(ax, ts, _trace_distance.(Plus, Trans), label = L"\text{d(Plus,Trans)}")
 
     axislegend(position = :rt)
 
@@ -93,8 +93,9 @@ end
 
 function plot_Ks(dirdata::String, row_idx, col_idx; tmax = nothing)
     effective_hamiltonian = computeKs(dirdata::String)
+    config = loadconfig(dirdata*"/config.JSON")
     # xs: time 
-    xs = meas.time
+    ts = effective_hamiltonian.time
     # ys: Real and Imag part of Effective Hamiltonian Ks
     Ks = effective_hamiltonian.Ks
     ReKs = [real(Ks[t][row_idx+1, col_idx+1]) for t in eachindex(Ks)]
