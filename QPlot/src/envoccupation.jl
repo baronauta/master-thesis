@@ -271,25 +271,17 @@ function animate_chain_occupation(dirdata::String, outdir::String)
 
 end
 
-function animate_envmodes_occupation(dirdata::String, outdir::String)
-    config = loadconfig(dirdata * "/config.JSON")
-
+function animate_envmodes_occupation(dirdata::String, outdir::String; xmin=-1, xmax=1)
     # 1. Collect data
+    config = loadconfig(dirdata * "/config.JSON")
     # Normal modes (xs), modes occupation (ns) and time for labels (ts)
-    (rawdata, header) = readdlm("$dirdata/envmodes_modes.dat", ',', Float64, header = true)
-    modes = rawdata[:] # flatten from Matrix to Vector
-    (rawdata, header) = readdlm("$dirdata/envmodes_data.dat", ',', Float64, header = true)
-    meastime = rawdata[:, 1]
+    modes, ns, meastime = read_envmodes_occupation(dirdata)
     ts = round.(meastime, digits = 1)
-    ns = rawdata[:, 2:end]
-
-    # Find the maximum in the inner region (no finite-domain effects)
-    ncols = size(ns, 2)
-    margin = round(Int, 0.001 * ncols)
-    inner_ns = ns[:, margin+1:end-margin]
-    ns_max = maximum(inner_ns)
+    # Get max value of the mode occupations
+    max_ns = maximum([maximum(n) for n in ns])
     # Thermalized spectral density function for reference
-    sdfx = collect(range(config.domain..., 1000))
+    support = [-config.domain[2], config.domain[2]]
+    sdfx = collect(range(support..., 1000))
     sdfy = [
         thermal_ohmic_sdf(
             x,
@@ -297,7 +289,8 @@ function animate_envmodes_occupation(dirdata::String, outdir::String)
             config.temperature,
         ) for x in sdfx
     ]
-    sdfy = sdfy ./ maximum(sdfy) .* 1 / 10 * ns_max # rescale sdf (it is just for reference)
+    # Scale sdfy to 50% of max_ns
+    scaled_sdfy = sdfy ./ maximum(sdfy) .* (0.5 * max_ns)
     # Frequency transition for Hs (bare system Hamiltonian):
     # Hs = ϵ σz + Δ σx → E± = √(ϵ^2+Δ^2) eigvals of Hs,
     # frequency transition is ωs = (E+ - E-)/ħ = 2√(ϵ^2+Δ^2).
@@ -320,8 +313,7 @@ function animate_envmodes_occupation(dirdata::String, outdir::String)
     # Dynamic data -> `Observable`
     obs_ys = Observable(ns[1, :])
     obs_time = Observable(ts[1])
-    obs_freq = Observable(freq[1])
-    obs_negfreq = Observable(negfreq[1])
+    obs_freq, obs_negfreq = Observable(freq[1]), Observable(negfreq[1])
     # Text for the tile, using `@lift` it will be updated runtime
     text = @lift("t = $($obs_time)")
 
@@ -334,14 +326,10 @@ function animate_envmodes_occupation(dirdata::String, outdir::String)
         title = text,
     )
 
-    # Set y-axis limits: consider `ns_max =  maximum(ns)`
-
-    ylims!(ax, 0, ns_max * 11 / 10) # add 10% for better visibility
-    # Set x-axis limits: use provided values or auto-trim 10% at each end to reduce edge artifacts
-    # xmin, xmax = minimum(xs), maximum(xs)
-    # dx = xmax - xmin
-    # xlims!(ax, xmin + 0.01*dx, xmax - 0.01*dx)
-    xlims!(ax, -1, 1)
+    # Set y-axis limits
+    ylims!(ax, 0, max_ns * 11 / 10) # add 10% for better visibility
+    # Set x-axis limits
+    xlims!(ax, xmin, xmax)
 
     lines!(
         ax,
@@ -353,7 +341,7 @@ function animate_envmodes_occupation(dirdata::String, outdir::String)
     # Fill space under the plot
     band!(ax, xs, zeros(length(xs)), obs_ys, color = (:darkorange1, 0.2))
     # Sdf for reference
-    lines!(ax, sdfx, sdfy, color = :gray)
+    lines!(ax, sdfx, scaled_sdfy, color = :gray, label=L"J(\omega)")
     # Vertical lines indicating eigenvalues of the bare system Hs
     vlines!(
         ax,
@@ -383,13 +371,12 @@ function animate_envmodes_occupation(dirdata::String, outdir::String)
             progress_for_one_step!(i, ns, ts, freq, negfreq)
         obs_ys[] = newys
         obs_time[] = newtime
-        obs_freq[] = newfreq
-        obs_negfreq[] = newnegfreq
+        obs_freq[], obs_negfreq[] = newfreq, newnegfreq
     end
 
     # 5. Save in a .mp4 file
     frames = 1:length(ts)-1
-    record(fig, "$outdir/envmodes_occupation.mp4", frames; framerate = 30) do i
+    record(fig, "$outdir/envmodes_occupation_xmin_$(xmin)_xmax_$(xmax).mp4", frames; framerate = 30) do i
         animstep!(i, ns, ts, freq, negfreq, obs_ys, obs_time, obs_freq, obs_negfreq)
     end
 

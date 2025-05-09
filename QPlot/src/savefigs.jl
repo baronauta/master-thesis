@@ -12,7 +12,7 @@ Save a collection of figures and animations for a given dataset.
 # Outputs
 Saves PNG files and animations to `figs/<dirdataname>`.
 """
-function savefigs(dirdata::String)
+function savefigs(dirdata::String; tmax=nothing, xmin=-1, xmax=1)
     # All figures will be stored in a new directory, e.g. figs/ohmic_lowT
     dirdataname = basename(dirdata)
     outdir = "figs/$dirdataname"
@@ -25,14 +25,19 @@ function savefigs(dirdata::String)
     end
 
     # save("$outdir/chain_coefficients.png", plot_chain_coefficients(dirdata))
-
-    save("$outdir/Ks00.png", plot_Ks(dirdata, 0, 0))
-    save("$outdir/Ks01.png", plot_Ks(dirdata, 0, 1))
-    save("$outdir/Ks11.png", plot_Ks(dirdata, 1, 1))
+    if isnothing(tmax)
+        save("$outdir/Ks00.png", plot_Ks(dirdata, 0, 0))
+        save("$outdir/Ks01.png", plot_Ks(dirdata, 0, 1))
+        save("$outdir/Ks11.png", plot_Ks(dirdata, 1, 1))
+    else 
+        save("$outdir/Ks00_tmax_$(tmax).png", plot_Ks(dirdata, 0, 0; tmax=tmax))
+        save("$outdir/Ks01_tmax_$(tmax).png", plot_Ks(dirdata, 0, 1; tmax=tmax))
+        save("$outdir/Ks11_tmax_$(tmax).png", plot_Ks(dirdata, 1, 1; tmax=tmax))
+    end
     save("$outdir/trans_freqs.png", plot_transitionfreqs(dirdata))
 
     animate_chain_occupation(dirdata, outdir)
-    animate_envmodes_occupation(dirdata, outdir)
+    animate_envmodes_occupation(dirdata, outdir; xmin=xmin, xmax=xmax)
 end
 
 """
