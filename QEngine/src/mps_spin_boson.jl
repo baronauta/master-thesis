@@ -9,11 +9,7 @@ prepared in the vacuum state.
 - `sysenv::Vector{<:Index}`: a vector that combines the system and environment indices;
 - `psi0`: MPS representation of the initial state.
 """
-function defineSystem(
-    sys_state::String,
-    chain_length::Int64,
-    local_dim::Int64
-)
+function defineSystem(sys_state::String, chain_length::Int64, local_dim::Int64)
     # Indexes needed for defining the MPS
     sys = siteinds("S=1/2", 1)
     env = siteinds("Boson", dim = local_dim, chain_length)

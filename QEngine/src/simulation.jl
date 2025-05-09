@@ -124,7 +124,12 @@ end
 - `filename::String`: Path to the JSON configuration file.
 - `tomoStates::Vector{String}`: (Optional) List of initial states to evolve. Defaults to `["Up", "Dn", "+", "i"]`.
 """
-function tomodynamics(filename::String; intHsysSide="Sx", tomoStates = ["Up", "Dn", "+", "i"])
+
+function tomodynamics(
+    filename::String;
+    intHsysSide = "Sx",
+    tomoStates = ["Up", "Dn", "+", "i"],
+)
     config = loadconfig(filename)
     # Compute TEDOPA or T-TEDOPA coefficients according to temperature T
     coefficients = chain_coefficients(filename)
@@ -138,7 +143,14 @@ function tomodynamics(filename::String; intHsysSide="Sx", tomoStates = ["Up", "D
         # MPS of the initial state of the composite system TLS⊗bath
         (sysenv, psi0) = defineSystem(case, config.chain_length, config.local_dim)
         # MPO of the Hamiltonian H = H_S + H_E + H_I
-        H = createMPO(sysenv, config.epsilon, config.Delta, intHsysSide, freqs_file, coups_file)
+        H = createMPO(
+            sysenv,
+            config.epsilon,
+            config.Delta,
+            intHsysSide,
+            freqs_file,
+            coups_file,
+        )
 
         # Measure Sx, Sy, Sz on the TLS, i.e. determination of the density matrix ρ of the TLS.
         # Measuring "iSy" to workaround an issue with the ITensors (or ITensorMPS?) package.
@@ -181,7 +193,7 @@ end
 # Arguments
 - `filename::String`: Path to the JSON configuration file.
 """
-function sysenv_dynamics(filename; sys_state="Up", intHsysSide="Sx")
+function sysenv_dynamics(filename; sys_state = "Up", intHsysSide = "Sx")
     config = loadconfig(filename)
     # Compute TEDOPA or T-TEDOPA coefficients according to temperature T
     coefficients = chain_coefficients(filename)
