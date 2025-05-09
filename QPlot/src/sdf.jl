@@ -1,80 +1,83 @@
-# ─────────────────────────────────────────────────────────────
-# Spectral density function
-# - sdf
-# - thermalized sdf
-# - chain coefficients
-# ─────────────────────────────────────────────────────────────
-
-"""
-    plot_sdf(filename::String)
-
-Plot the spectral density J(ω) from JSON file `filename`.
-Returns a `Figure`.
-"""
-function plot_sdf(filename::String)
-    # Parse filename with sdf paramters
-    p = open(filename) do input
-        JSON.parse(read(input, String))
-    end
-    # Read a and support
-    a = Float64.(p["environment"]["spectral_density_parameters"])
-    support = Float64.(p["environment"]["domain"])
-    # Create and a callable object to compute sdf
-    fn = p["environment"]["spectral_density_function"]
-    tmp = eval(Meta.parse("(a, x) -> " * fn))
-    sdf = x -> Base.invokelatest(tmp, a, x)
-
-    f = Figure()
-    xs = collect(range(support..., 1000))
-    ys = sdf.(xs)
-    ax = Axis(f[1, 1], xlabel = L"\omega", ylabel = L"J(\omega)")
-    lines!(ax, xs, ys)
-    f
+struct SpectralDensityParams
+    α::Float64
+    s::Float64
+    ωc::Float64
 end
 
-"Copied from pharrex repository."
-function boson_thermal_factor(x, T)
+struct TLSParams
+    ϵ::Float64
+    Δ::Float64
+end
+
+function ohmic_sdf(x, params::SpectralDensityParams)
+    return π/2 * params.α * x^params.s / params.ωc^(params.s - 1) * exp(-x / params.ωc)
+end
+
+function ohmic_sdf(x, params::SpectralDensityParams, tls::TLSParams)
+    scale = 2*sqrt(tls.ϵ^2 + tls.Δ^2) ^ params.s
+    return π/2 * params.α/scale * x^params.s / params.ωc^(params.s - 1) * exp(-x / params.ωc)
+end
+
+function thermal_ohmic_sdf(x, params::SpectralDensityParams, T)
     if T == 0
-        # In this case we could write f=1 and be done with it, but instead we choose
-        # this more articulated way so that even if the caller doesn't already
-        # exclude (-∞,0) from the support, we do it ourselves now.
-        f = x > 0 ? one(x) : zero(x)
+        return x > 0 ? ohmic_sdf(x, params) : 0
     else
-        f = 1 / 2 * (1 + coth(0.5 * x / T))
+        return 0.5 * (1 + coth(0.5 * x / T)) * sign(x) * ohmic_sdf(abs(x), params)
     end
-    return f
 end
 
-"""
-    plot_thermal_sdf(filename::String) -> Figure
-
-Plot the thermal spectral density J_β(ω) with temperature and parameters annotated.
-Returns a `Figure`.
-"""
-function plot_thermal_sdf(filename::String)
-    # Parse filename with sdf paramters
-    p = open(filename) do input
-        JSON.parse(read(input, String))
+function thermal_ohmic_sdf(x, params::SpectralDensityParams, T, tls::TLSParams)
+    if T == 0
+        return x > 0 ? ohmic_sdf(x, params, tls) : 0
+    else
+        return 0.5 * (1 + coth(0.5 * x / T)) * sign(x) * ohmic_sdf(abs(x), params, tls)
     end
-    # Read a and support
-    a = Float64.(p["environment"]["spectral_density_parameters"])
-    support = Float64.(p["environment"]["domain"])
-    therm_support = [-support[2], support[2]]
-    # Create a callable object to compute sdf
-    fn = p["environment"]["spectral_density_function"]
-    tmp = eval(Meta.parse("(a, x) -> " * fn))
-    sdf = x -> Base.invokelatest(tmp, a, x)
-    # Defining the thermalized sdf
-    therm_sdf(x) = boson_thermal_factor(x, T) * sign(x) * sdf(abs(x))
+end
 
-    f = Figure()
-    xs = collect(range(therm_support..., 1000000))
-    ys = therm_sdf.(xs)
-    ax = Axis(f[1, 1], xlabel = L"\omega", ylabel = L"J_\beta(\omega)")
-    lines!(ax, xs, ys, label = L"T=%$(temp),\,\alpha=%$(a[1]),\,s=%$(a[3])")
+function plot_ohmic_sdf(params::SpectralDensityParams, support)
+    fig = Figure()
+    xs = collect(range(support..., 1000))
+    ys = [ohmic_sdf(x, params) for x in xs]
+
+    ax = Axis(fig[1, 1], xlabel = L"\omega", ylabel = L"J(\omega)")
+    lines!(ax, xs, ys, label=L"s = %$(params.s)")
     axislegend(position = :rt)
-    f
+    return fig
 end
+
+function plot_ohmic_sdf(params::SpectralDensityParams, support, tls::TLSParams)
+    fig = Figure()
+    xs = collect(range(support..., 1000))
+    ys = [ohmic_sdf(x, params, tls) for x in xs]
+
+    ax = Axis(fig[1, 1], xlabel = L"\omega", ylabel = L"J(\omega)")
+    lines!(ax, xs, ys, label=L"s = %$(params.s)")
+    axislegend(position = :rt)
+    return fig
+end
+
+function plot_thermal_ohmic_sdf(params::SpectralDensityParams, T, support)
+    fig = Figure()
+    xs = collect(range(support..., 1000))
+    ys = [thermal_ohmic_sdf(x, params, T) for x in xs]
+
+    ax = Axis(fig[1, 1], xlabel = L"\omega", ylabel = L"J(\omega)")
+    lines!(ax, xs, ys, label=L"s = %$(params.s),\, T = %$T")
+    axislegend(position = :rt)
+    return fig
+end
+
+function plot_thermal_ohmic_sdf(params::SpectralDensityParams, T, support, tls::TLSParams)
+    fig = Figure()
+    xs = collect(range(support..., 1000))
+    ys = [thermal_ohmic_sdf(x, params, T, tls) for x in xs]
+
+    ax = Axis(fig[1, 1], xlabel = L"\omega", ylabel = L"J(\omega)")
+    lines!(ax, xs, ys, label=L"s = %$(params.s),\, T = %$T")
+    axislegend(position = :rt)
+    return fig
+end
+
 
 """
     plot_chain_coefficients(filename::String)
@@ -82,8 +85,8 @@ end
 Plot chain transformation frequencies and couplings from `filename` data.
 Returns a `Figure`.
 """
-function plot_chain_coefficients(filename::String)
-    coefficients = chain_coefficients(filename)
+function plot_chain_coefficients(dirdata::String)
+    coefficients = chain_coefficients(dirdata * "/config.json")
     f = Figure()
     ax = Axis(f[1, 1], xlabel = L"n", ylabel = "Chain coefficients")
     lines!(
