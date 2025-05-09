@@ -129,7 +129,6 @@ function plot_thermal_ohmic_sdf(params::SpectralDensityParams, T, support, tls::
     return fig
 end
 
-
 """
     plot_chain_coefficients(filename::String)
 

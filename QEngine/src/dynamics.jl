@@ -11,6 +11,7 @@
 
 function horrendus_filtering(qmap::Matrix{ComplexF64})
     eps = 1e-10
+
     A = [
         1 1 1 1
         1 1 0 0
@@ -23,6 +24,7 @@ function horrendus_filtering(qmap::Matrix{ComplexF64})
         eps eps 0 0
         eps eps 0 0
     ]
+
     return A .* qmap .+ B
 end
 
@@ -411,7 +413,6 @@ function envmodes_occupation(dirdata::String; NN = 700, nframes = 10000)
         t_values = [sum(U_squared[k, n] * c_values[k][t] for k = 1:NN) for n = 1:NN]
         push!(data, t_values)
     end
-
     # Write results to files
     open("$dirdata/envmodes_data.dat", "w") do io
         println(io, join(["time"; ["mode_$(i)" for i = 1:length(modes)]], ","))

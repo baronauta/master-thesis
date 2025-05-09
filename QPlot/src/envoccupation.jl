@@ -208,6 +208,7 @@ end
 # ─────────────────────────────────────────────────────────────
 
 function animate_chain_occupation(dirdata::String, outdir::String)
+
     config = loadconfig(dirdata * "/config.JSON")
     # 1. Collect data
     data = chain_occupation(dirdata)
@@ -281,6 +282,7 @@ function animate_envmodes_occupation(dirdata::String, outdir::String)
     meastime = rawdata[:, 1]
     ts = round.(meastime, digits = 1)
     ns = rawdata[:, 2:end]
+
     # Find the maximum in the inner region (no finite-domain effects)
     ncols = size(ns, 2)
     margin = round(Int, 0.001 * ncols)
@@ -333,6 +335,7 @@ function animate_envmodes_occupation(dirdata::String, outdir::String)
     )
 
     # Set y-axis limits: consider `ns_max =  maximum(ns)`
+
     ylims!(ax, 0, ns_max * 11 / 10) # add 10% for better visibility
     # Set x-axis limits: use provided values or auto-trim 10% at each end to reduce edge artifacts
     # xmin, xmax = minimum(xs), maximum(xs)
