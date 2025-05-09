@@ -422,24 +422,25 @@ function envmodes_occupation(dirdata::String; extendN = 700)
     # <cⱼ† cⱼ> = 0 with i from N+2 to NN+1.
     # Load measurement data: <c† c> values over time
     meas = get_measurements(dirdata * "/measurements_N.dat", "N")
+    result, meastime = meas.result, meas.time
     # Build list of per-site occupation time series
     c_site_occupations = Vector{Vector{Float64}}()
     for site_index in 2:NN+1
         key = "N{$(site_index)}_re"
-        values = haskey(meas.result, key) ? meas.result[key] : zeros(lenth(meas.time))
+        values = haskey(result, key) ? result[key] : zeros(lenth(meastime))
         push!(c_site_occupations, values)
     end
 
     # Compute occupation numbers of each normal mode over time
-    mode_occupations = envmodes_occupation(meastime, U_squared, c_site_occupations)
+    mode_occupations = envmodes_occupation(time, U_squared, c_site_occupations)
 
     # Write mode occupations over sampled time indices to file
     open("$dirdata/envmodes_data.dat", "w") do io
         # Header
         println(io, join(["time"; ["mode_$(i)" for i = 1:NN]], ","))
         # Transpose mode_occupations so each row is time → [mode_1, mode_2, ..., mode_N]
-        for idx in 1:T
-            row = [meas.time[idx]]
+        for idx in eachindex(meastime)
+            row = [meastime[idx]]
             for mode in mode_occupations
                 push!(row, mode[idx])
             end
