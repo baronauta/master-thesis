@@ -393,6 +393,7 @@ function envmodes_occupation(dirdata::String; NN = 700, nframes = 10000)
     #   Hₑ = t† D t, with t:=Uc, t†:=c†U†
     # Occupation number of the new modes: 
     #   <tₙ† tₙ> = ∑k U[k,n]^2 * <cₖ† cₖ†>, with k = 0,...,N-1.
+    U = transpose(U)
 
     # MPS of sys⊗env: environment sites from {2} to {N+1}
     # <cⱼ† cⱼ> = meas["N{i}_re"] with i from 2 to N+1,
