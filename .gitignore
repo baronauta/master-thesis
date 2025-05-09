@@ -2,7 +2,8 @@
 *.mp4
 *.ipynb
 
-myscript
+env
+tomo
 script.sh
 
 data*
