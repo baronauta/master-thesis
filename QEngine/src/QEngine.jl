@@ -18,7 +18,7 @@ export chain_coefficients,
     suggest_dt_N, loadconfig, tomodynamics, sysenv_dynamics, get_measurements
 include("simulation.jl")
 
-export computeKs, computeUs, chain_occupation, envmodes_occupation, effective_freqs
+export computeKs, computeUs, chain_occupation, envmodes_occupation, read_envmodes_occupation, effective_freqs
 include("dynamics.jl")
 
 end

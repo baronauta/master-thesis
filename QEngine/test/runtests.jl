@@ -3,6 +3,7 @@ using LinearAlgebra
 using Test
 
 import QEngine: changebasis, A2Bmatrix, krausdecomposition
+import QEngine: envmodes_occupation
 
 @testset "Depolarizing channel" begin
 
@@ -50,4 +51,39 @@ import QEngine: changebasis, A2Bmatrix, krausdecomposition
     # @test eigvals[2] * krausoperators[2] ≈ sqrt(p/4) * paulimatrices[3]
     # @test eigvals[3] * krausoperators[3] ≈ sqrt(p/4) * paulimatrices[4]
     # @test sqrt(eigvals[4]) * krausoperators[4] ≈ sqrt(1-3*p/4) * paulimatrices[1]
+end
+
+@testset "Normal modes occupation" begin
+
+    A = [ 2. 1. 0.; 1. 2. 1.; 0. 1. 2.]
+    # A = Uᵀ D U
+    e1, e2, e3 = 0.5857864376269073, 2.0000000000000018, 3.414213562373095
+    D = Diagonal([e1, e2, e3])
+    E1 = [-0.5,  0.7071067811865476, -0.5]
+    E2 = [-0.7071067811865476, 0., 0.7071067811865476]
+    E3 = [0.5,  0.7071067811865476, 0.5]
+    U = [E1 E2 E3] # U columns are E1, E2, E3
+    reconstructed_A = U * D * transpose(U)
+    @test isapprox(A, reconstructed_A; atol=1e-10, rtol=1e-8)
+    c1, c2, c3 = [1.0, 2.0], [3.0, 0.0], [0.0, 0.0]
+    # <tₙ† tₙ> = ∑k U[k,n]^2 * <cₖ† cₖ†>
+    t1 = [ 
+        U[1,1]^2 * c1[1] + U[2,1]^2 * c2[1] + U[3,1]^2 * c3[1],
+        U[1,1]^2 * c1[2] + U[2,1]^2 * c2[2] + U[3,1]^2 * c3[2]
+        ]
+    t2 = [ 
+        U[1,2]^2 * c1[1] + U[2,2]^2 * c2[1] + U[3,2]^2 * c3[1],
+        U[1,2]^2 * c1[2] + U[2,2]^2 * c2[2] + U[3,2]^2 * c3[2]
+        ]
+    t3 = [ 
+        U[1,3]^2 * c1[1] + U[2,3]^2 * c2[1] + U[3,3]^2 * c3[1],
+        U[1,3]^2 * c1[2] + U[2,3]^2 * c2[2] + U[3,3]^2 * c3[2]
+        ]
+    meastime = [1., 2.]
+    U_squared = U.^2
+    c_site_occupations = [c1, c2, c3]
+    ns = envmodes_occupation(meastime, U_squared, c_site_occupations)
+    @test ns[1] ≈ t1
+    @test ns[2] ≈ t2
+    @test ns[3] ≈ t3
 end

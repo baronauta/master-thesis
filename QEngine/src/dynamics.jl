@@ -345,7 +345,11 @@ function _normalmodes(filename::String; extendN = 500)
     # sub-diagonal and super-diagonal formed by couplings κn (n = 1...N-1).
     params = JSON.parsefile(filename)
     # I fictitiously enlarge the chain, see Riva et al.: PRB 108, 195138 (2023), Appendix E.
-    params["chain_length"] = extendN # < PolyChaos_nquad
+    # chain_lenght < PolyChaos_nquad !
+    params["chain_length"] = extendN
+    if params["PolyChaos_nquad"] < extendN
+        params["PolyChaos_nquad"] = extendN * 10
+    end
     coeff = chain_coefficients(params)
     f = coeff.frequencies
     # Couplings κn with n = 0...N-1. But κ0, the one for the TLS-env interaction,
@@ -368,6 +372,22 @@ function _normalmodes(filename::String; extendN = 500)
     return D, U
 end
 
+
+function envmodes_occupation(meastime, U_squared, c_site_occupations)
+    mode_occupations = Vector{Vector{Float64}}()
+    NN = size(U_squared,1)
+    T = length(meastime)
+    for n in 1:NN  # loop over modes
+        mode_values = Float64[]
+        for t in 1:T  # loop over time
+            occ = sum(U_squared[k, n] * c_site_occupations[k][t] for k in 1:NN)
+            push!(mode_values, occ)
+        end
+        push!(mode_occupations, mode_values)
+    end
+    return mode_occupations
+end
+
 """
     envmodes_occupation(dirdata::String)
 
@@ -378,13 +398,13 @@ Compute occupation of environment normal modes and write to CSV.
 # Arguments
 - `dirdata::String`: path to directory for measurements and output.
 """
-function envmodes_occupation(dirdata::String; NN = 700, nframes = 10000)
+function envmodes_occupation(dirdata::String; extendN = 700)
     # Any Hermitian (here also real) matrix can be diagonalized by a unitary matrix.
     #   A = U D Uᵀ,
     # with D being a diagonal matrix and U  being unitary matrix, Uᵀ=U⁻¹=U†.
     # (Optional)
-    # Extend fictitiously the chian with 0s entries; chain length: N ↦ NN.
-    D, U = _normalmodes(dirdata * "/config.json"; extendN = NN)
+    # Extend fictitiously the chain with 0s entries; chain length: N ↦ NN.
+    D, U = _normalmodes(dirdata * "/config.json"; extendN = extendN)
     modes = diag(D)
     NN = length(modes)
     # I prefer to see A = U† D U. In fact, given Hₑ = c† A c 
@@ -394,34 +414,40 @@ function envmodes_occupation(dirdata::String; NN = 700, nframes = 10000)
     # Occupation number of the new modes: 
     #   <tₙ† tₙ> = ∑k U[k,n]^2 * <cₖ† cₖ†>, with k = 0,...,N-1.
     U = transpose(U)
+    # Precompute U^2 values (squared coefficients for each mode)
+    U_squared = U.^2
 
     # MPS of sys⊗env: environment sites from {2} to {N+1}
     # <cⱼ† cⱼ> = meas["N{i}_re"] with i from 2 to N+1,
-    # <cⱼ† cⱼ> = 0 with i from N+2 to NN+1
+    # <cⱼ† cⱼ> = 0 with i from N+2 to NN+1.
+    # Load measurement data: <c† c> values over time
     meas = get_measurements(dirdata * "/measurements_N.dat", "N")
-    c_values = [get(meas.result, "N{$i}_re", zeros(length(meas.time))) for i = 2:NN+1]
-
-    # Precompute U^2 values (squared coefficients for each mode)
-    U_squared = [U[k, n]^2 for k = 1:NN, n = 1:NN]
-
-    # Set time step indices for animation
-    T = length(meas.time)
-    timesampled_indices = round.(Int, LinRange(1, T, min(nframes, T)))
-
-    # Compute occupation numbers
-    data = Vector{Vector{Float64}}()
-    for t in timesampled_indices
-        t_values = [sum(U_squared[k, n] * c_values[k][t] for k = 1:NN) for n = 1:NN]
-        push!(data, t_values)
+    # Build list of per-site occupation time series
+    c_site_occupations = Vector{Vector{Float64}}()
+    for site_index in 2:NN+1
+        key = "N{$(site_index)}_re"
+        values = haskey(meas.result, key) ? meas.result[key] : zeros(lenth(meas.time))
+        push!(c_site_occupations, values)
     end
-    # Write results to files
+
+    # Compute occupation numbers of each normal mode over time
+    mode_occupations = envmodes_occupation(meastime, U_squared, c_site_occupations)
+
+    # Write mode occupations over sampled time indices to file
     open("$dirdata/envmodes_data.dat", "w") do io
-        println(io, join(["time"; ["mode_$(i)" for i = 1:length(modes)]], ","))
-        for (k, t_index) in enumerate(timesampled_indices)
-            println(io, join([meas.time[t_index]; data[k]], ","))
+        # Header
+        println(io, join(["time"; ["mode_$(i)" for i = 1:NN]], ","))
+        # Transpose mode_occupations so each row is time → [mode_1, mode_2, ..., mode_N]
+        for idx in 1:T
+            row = [meas.time[idx]]
+            for mode in mode_occupations
+                push!(row, mode[idx])
+            end
+            println(io, join(row, ","))
         end
     end
 
+    # Write normal modes ti file
     open("$dirdata/envmodes_modes.dat", "w") do io
         println(io, "frequency")
         for f in modes
@@ -430,6 +456,13 @@ function envmodes_occupation(dirdata::String; NN = 700, nframes = 10000)
     end
 end
 
+function read_envmodes_occupation(dirdata::String)
+    (rawdata, header) = readdlm("$dirdata/envmodes_modes.dat", ',', Float64, header = true)
+    modes = rawdata[:] # flatten from Matrix to Vector
+    (rawdata, header) = readdlm("$dirdata/envmodes_data.dat", ',', Float64, header = true)
+    meastime, ns = rawdata[:, 1], rawdata[:, 2:end]
+    return modes, ns, meastime
+end
 
 """
     effective_freqs(dirdata::String, time::Vector{Float64})
