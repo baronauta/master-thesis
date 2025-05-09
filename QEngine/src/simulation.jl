@@ -227,16 +227,13 @@ function sysenv_dynamics(filename; sys_state = "Up", intHsysSide = "Sx")
     # Increase manually the bond dimension of the initial state (which is factorized, so that χ=1 on all bonds)
     psi0ext = growMPS(psi0, config.grow_mps)[1]
 
-    # Calculate tmax from tΔ/π: tmax = tΔ/π * π/Δ
-    tmax = config.tmax
-
     # Run TDVP1
     tmpfile = tempname()
     tdvp1!(
         psi0ext,
         H,
         config.dt,
-        tmax;
+        config.tmax;
         hermitian = true,
         normalize = false,
         callback = cb,
