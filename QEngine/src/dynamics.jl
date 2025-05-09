@@ -427,12 +427,12 @@ function envmodes_occupation(dirdata::String; extendN = 700)
     c_site_occupations = Vector{Vector{Float64}}()
     for site_index in 2:NN+1
         key = "N{$(site_index)}_re"
-        values = haskey(result, key) ? result[key] : zeros(lenth(meastime))
+        values = haskey(result, key) ? result[key] : zeros(length(meastime))
         push!(c_site_occupations, values)
     end
 
     # Compute occupation numbers of each normal mode over time
-    mode_occupations = envmodes_occupation(time, U_squared, c_site_occupations)
+    mode_occupations = envmodes_occupation(meastime, U_squared, c_site_occupations)
 
     # Write mode occupations over sampled time indices to file
     open("$dirdata/envmodes_data.dat", "w") do io

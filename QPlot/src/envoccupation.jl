@@ -265,7 +265,7 @@ function animate_chain_occupation(dirdata::String, outdir::String)
 
     # 5. Save in a .mp4 file
     frames = 1:length(ts)-1
-    record(fig, "$outdir/chain_occupation.mp4", frames; framerate = 30) do i
+    record(fig, "$outdir/chain_occupation.mp4", frames; framerate = 60) do i
         animstep!(i, ns, ts, obs_ys, obs_time)
     end
 
@@ -376,7 +376,7 @@ function animate_envmodes_occupation(dirdata::String, outdir::String; xmin=-1, x
 
     # 5. Save in a .mp4 file
     frames = 1:length(ts)-1
-    record(fig, "$outdir/envmodes_occupation_xmin_$(xmin)_xmax_$(xmax).mp4", frames; framerate = 30) do i
+    record(fig, "$outdir/envmodes_occupation_xmin_$(xmin)_xmax_$(xmax).mp4", frames; framerate = 60) do i
         animstep!(i, ns, ts, freq, negfreq, obs_ys, obs_time, obs_freq, obs_negfreq)
     end
 
