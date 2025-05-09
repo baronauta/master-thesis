@@ -40,7 +40,7 @@ Save the `coefficients` of a TEDOPA chain mapping, which contains `frequencies` 
 to CSV files. A folder named `chain_coefficients` will be created in the specified directory `save_to_dir`
 to store the CSV files.
 """
-function save_tedopa_coefficients(coefficients, save_to_dir)
+function save_coefficients_to_csv(coefficients, save_to_dir)
     mkpath(save_to_dir * "/chain_coefficients")
     freqs_file = save_to_dir * "/chain_coefficients/freqs.csv"
     coups_file = save_to_dir * "/chain_coefficients/coups.csv"
@@ -60,7 +60,61 @@ function save_tedopa_coefficients(coefficients, save_to_dir)
 end
 
 # ─────────────────────────────────────────────────────────────
-# Simulation
+# Using TDVP technique
+#   - dynamics of tomographic basis
+#   - dynamics of a state and environment 
+# ─────────────────────────────────────────────────────────────
+
+"""
+    suggest_dt_N(parameters::Dict{<:AbstractString, Any})
+
+Calculates suggested time step (`dt`) and chain length (`N`) based on input parameters.
+"""
+function suggest_dt_N(filename, tmax)
+    # Extract necessary coefficients for parameter calculations
+    coefficients = chain_coefficients(filename)
+    k∞ = coefficients.couplings[end] # Asymptotic coupling coefficient
+
+    # Rule-of-thumb formulas to determine the optimal chain_length and time step dt:
+    # - dt = 1 / (k∞ * 50)
+    # - N = 2 * k∞ * tmax
+
+    # Suggested time step (dt)
+    dt = round(1 / (k∞ * 50), sigdigits = 1, base = 10)
+    # Suggested chain length N
+    N = round(Int, 2 * k∞ * tmax)
+
+    return dt, N
+end
+
+"""
+    loadconfig(filename::String)
+
+Load system and simulation parameters from a JSON configuration file.
+Return a flat named tuple containing all relevant parameters.
+"""
+function loadconfig(filename::String)
+    config = JSON.parsefile(filename)
+
+    return (
+        epsilon = config["TLS"]["epsilon"],
+        Delta = config["TLS"]["Delta"],
+        dt = config["simulation"]["dt"],
+        tmax = config["simulation"]["tmax"],
+        grow_mps = config["simulation"]["grow_mps"],
+        local_dim = config["simulation"]["local_dim"],
+        domain = config["environment"]["domain"],
+        a = config["environment"]["spectral_density_parameters"],
+        sdf = config["environment"]["spectral_density_function"],
+        temperature = config["environment"]["temperature"],
+        chain_length = config["chain_length"],
+    )
+end
+
+# ─────────────────────────────────────────────────────────────
+# Using TDVP technique
+#   - dynamics of tomographic basis
+#   - dynamics of a state and environment 
 # ─────────────────────────────────────────────────────────────
 
 """
@@ -70,26 +124,21 @@ end
 - `filename::String`: Path to the JSON configuration file.
 - `tomoStates::Vector{String}`: (Optional) List of initial states to evolve. Defaults to `["Up", "Dn", "+", "i"]`.
 """
-function tomodynamics(filename::String; tomoStates = ["Up", "Dn", "+", "i"])
+function tomodynamics(filename::String; intHsysSide="Sx", tomoStates = ["Up", "Dn", "+", "i"])
     config = loadconfig(filename)
     # Compute TEDOPA or T-TEDOPA coefficients according to temperature T
     coefficients = chain_coefficients(filename)
     # Store chain coefficients in CSV files;
     # these will be used in MPO definition.
     dir = dirname(filename)
-    freqs_file, coups_file = save_tedopa_coefficients(coefficients, dir)
+    freqs_file, coups_file = save_coefficients_to_csv(coefficients, dir)
 
     # Evolve tomographic states
     for case in tomoStates
         # MPS of the initial state of the composite system TLS⊗bath
-        (sysenv, psi0) = defineSystem(
-            sys_type = "S=1/2",
-            sys_istate = case,
-            chain_length = config.chain_length,
-            local_dim = config.local_dim,
-        )
+        (sysenv, psi0) = defineSystem(case, config.chain_length, config.local_dim)
         # MPO of the Hamiltonian H = H_S + H_E + H_I
-        H = createMPO(sysenv, config.epsilon, config.Delta, "Sz", freqs_file, coups_file)
+        H = createMPO(sysenv, config.epsilon, config.Delta, intHsysSide, freqs_file, coups_file)
 
         # Measure Sx, Sy, Sz on the TLS, i.e. determination of the density matrix ρ of the TLS.
         # Measuring "iSy" to workaround an issue with the ITensors (or ITensorMPS?) package.
@@ -105,16 +154,13 @@ function tomodynamics(filename::String; tomoStates = ["Up", "Dn", "+", "i"])
         # Increase manually the bond dimension of the initial state (which is factorized, so that χ=1 on all bonds)
         psi0ext = growMPS(psi0, config.grow_mps)[1]
 
-        # Calculate tmax from tΔ/π: tmax = tΔ/π * π/Δ
-        tmax = config.t_Delta_over_pi * π / config.Delta
-
         # Run TDVP1
         tmpfile = tempname()
         tdvp1!(
             psi0ext,
             H,
             config.dt,
-            tmax;
+            config.tmax;
             hermitian = true,
             normalize = false,
             callback = cb,
@@ -130,47 +176,47 @@ function tomodynamics(filename::String; tomoStates = ["Up", "Dn", "+", "i"])
 end
 
 """
-    envdynamics(filename::String)
+    sysenv_dynamics(filename::String; sys_state="Up", intHsysSide="Sx")
 
 # Arguments
 - `filename::String`: Path to the JSON configuration file.
 """
-function envdynamics(filename)
+function sysenv_dynamics(filename; sys_state="Up", intHsysSide="Sx")
     config = loadconfig(filename)
     # Compute TEDOPA or T-TEDOPA coefficients according to temperature T
     coefficients = chain_coefficients(filename)
     # Store chain coefficients in CSV files;
     # these will be used in MPO definition.
     dir = dirname(filename)
-    freqs_file, coups_file = save_tedopa_coefficients(coefficients, dir)
+    freqs_file, coups_file = save_coefficients_to_csv(coefficients, dir)
 
-    # MPS of the initial state of the composite system TLS⊗bath;
-    # consider the TLS to be in the "Up" state.
-    (sysenv, psi0) = defineSystem(
-        sys_type = "S=1/2",
-        sys_istate = "Up",
-        chain_length = config.chain_length,
-        local_dim = config.local_dim,
-    )
+    # MPS of the initial state of the composite system TLS⊗bath
+    (sysenv, psi0) = defineSystem(sys_state, config.chain_length, config.local_dim)
     # MPO of the Hamiltonian H = H_S + H_E + H_I
-    H = createMPO(sysenv, config.epsilon, config.Delta, "Sz", freqs_file, coups_file)
+    H = createMPO(sysenv, config.epsilon, config.Delta, intHsysSide, freqs_file, coups_file)
 
-    # Measure the ProjUp observable on the first site of the MPS, i.e. the one for the TLS.
+    # Measure the observables on the first site of the MPS, i.e. the one for the TLS.
     # Measure N on each site of the chain: these are the ones from 2 to chain_length + 1.
-    operators = [LocalOperator(Dict(1 => "ProjUp"))]
+    operators = [
+        LocalOperator(Dict(1 => "Sx")),
+        LocalOperator(Dict(1 => "iSy")),
+        LocalOperator(Dict(1 => "Sz")),
+    ]
     for i = 2:config.chain_length+1
         push!(operators, LocalOperator(Dict(i => "N")))
     end
-    # Measurements are performed every n integration steps to reduce computational cost. 
-    # This lower resolution is sufficient for the plots while speeding up the simulation.
-    dtmeas = 10 * config.dt
+    # # Measurements are performed every n integration steps to reduce computational cost. 
+    # # This lower resolution is sufficient for the plots while speeding up the simulation.
+    # dtmeas = 10 * config.dt
+    # Measurements performed at every integration step during the simulation
+    dtmeas = config.dt
     cb = ExpValueCallback(operators, sysenv, dtmeas)
 
     # Increase manually the bond dimension of the initial state (which is factorized, so that χ=1 on all bonds)
     psi0ext = growMPS(psi0, config.grow_mps)[1]
 
     # Calculate tmax from tΔ/π: tmax = tΔ/π * π/Δ
-    tmax = config.t_Delta_over_pi * π / config.Delta
+    tmax = config.tmax
 
     # Run TDVP1
     tmpfile = tempname()

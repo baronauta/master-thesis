@@ -1,55 +1,34 @@
-# ─────────────────────────────────────────────────────────────
-# Internal functions
-# ─────────────────────────────────────────────────────────────
-
-"Scale an existing time array `ts` by Δ / π."
-function _scalets(ts, Delta)
-    scale = Delta / π
-    return scale .* ts
-end
-
 "Shorten time domain for plots."
 function _timefilter(ts, ys, tmax)
     mask = ts .<= tmax
     return ts[mask], ys[mask]
 end
 
-# ─────────────────────────────────────────────────────────────
-# Density matrix
-# - dynamics of the tomographic states
-# - trace distance between tomographic states
-# ─────────────────────────────────────────────────────────────
-
 """
     plot_state(dirdata; state="Up")
 
 Plot the expectation values of σ_x, σ_y, σ_z and the trace norm for a single state.
 
-Arguments
+# Arguments
 - `dirdata::AbstractString`: Directory containing measurement files and config.json.
 - `state::AbstractString`: One of "Up", "Down", "Plus", or "Down".
 """
-function plot_state(dirdata; state="Up")
+function plot_state(dirdata; state = "Up")
     file = Dict(
-        "Up"    => "/measurements_Up.dat",
-        "Down"  => "/measurements_Dn.dat",
-        "Plus"  => "/measurements_+.dat",
+        "Up" => "/measurements_Up.dat",
+        "Down" => "/measurements_Dn.dat",
+        "Plus" => "/measurements_+.dat",
         "Trans" => "/measurements_i.dat",
     )
     meas = get_measurements(dirdata * file[state], "densitymatrix")
     measnorm = get_measurements(dirdata * file[state], "norm")
-    # xs: time scaled by Δ / π
-    config = loadconfig(dirdata * "/config.json")
-    ts = _scalets(meas.time, config.Delta)
+    # xs: time 
+    ts = meas.time
     # ys: density Matrix
     rho = meas.result
 
     f = Figure()
-    ax = Axis(
-        f[1, 1],
-        xlabel = L"t \Delta / \pi",
-        ylabel = "$state",
-    )
+    ax = Axis(f[1, 1], xlabel = L"\omega_c t", ylabel = "$state")
     ylims!(ax, -1, 1)
     # Plot
     lines!(ax, ts, real.(map(x -> tr(σ1 * x), rho)), label = L"\langle\sigma_x\rangle")
@@ -77,9 +56,8 @@ function plot_tomo_trdistance(dirdata)
     measPlus = get_measurements(dirdata * "/measurements_+.dat", "densitymatrix")
     measTrans = get_measurements(dirdata * "/measurements_i.dat", "densitymatrix")
 
-    # xs: time scaled by Δ / π
-    config = loadconfig(dirdata * "/config.json")
-    ts_scaled = _scalets(measUp.time, config.Delta)
+    # xs: time 
+    ts = measUp.time
 
     # ys: density Matrix
     Up = measUp.result
@@ -90,18 +68,18 @@ function plot_tomo_trdistance(dirdata)
     f = Figure()
     ax = Axis(
         f[1, 1],
-        xlabel = L"t \Delta / \pi",
+        xlabel = L"\omega_c t",
         ylabel = L"\text{d}_\text{Tr}\left(\rho_1,\rho_2\right)",
     )
     ylims!(ax, 0, 1)
 
     # Plot the trace distances
-    lines!(ax, ts_scaled, _trace_distance.(Up, Down), label = L"\text{d(Up,Down)}")
-    lines!(ax, ts_scaled, _trace_distance.(Up, Plus), label = L"\text{d(Up,Plus)}")
-    lines!(ax, ts_scaled, _trace_distance.(Up, Trans), label = L"\text{d(Up,Trans)}")
-    lines!(ax, ts_scaled, _trace_distance.(Down, Plus), label = L"\text{d(Down,Plus)}")
-    lines!(ax, ts_scaled, _trace_distance.(Down, Trans), label = L"\text{d(Down,Trans)}")
-    lines!(ax, ts_scaled, _trace_distance.(Plus, Trans), label = L"\text{d(Plus,Trans)}")
+    lines!(ax, ts, _trace_distance.(Up, Down), label = L"\text{d(Up,Down)}")
+    lines!(ax, ts, _trace_distance.(Up, Plus), label = L"\text{d(Up,Plus)}")
+    lines!(ax, ts, _trace_distance.(Up, Trans), label = L"\text{d(Up,Trans)}")
+    lines!(ax, ts, _trace_distance.(Down, Plus), label = L"\text{d(Down,Plus)}")
+    lines!(ax, ts, _trace_distance.(Down, Trans), label = L"\text{d(Down,Trans)}")
+    lines!(ax, ts, _trace_distance.(Plus, Trans), label = L"\text{d(Plus,Trans)}")
 
     axislegend(position = :rt)
 
@@ -115,9 +93,9 @@ end
 
 function plot_Ks(dirdata::String, row_idx, col_idx; tmax = nothing)
     effective_hamiltonian = computeKs(dirdata::String)
-    # xs: time scaled by Δ / π
-    config = loadconfig(dirdata * "/config.json")
-    ts = _scalets(effective_hamiltonian.time, config.Delta)
+    config = loadconfig(dirdata*"/config.JSON")
+    # xs: time 
+    ts = effective_hamiltonian.time
     # ys: Real and Imag part of Effective Hamiltonian Ks
     Ks = effective_hamiltonian.Ks
     ReKs = [real(Ks[t][row_idx+1, col_idx+1]) for t in eachindex(Ks)]
@@ -135,7 +113,7 @@ function plot_Ks(dirdata::String, row_idx, col_idx; tmax = nothing)
     # Real part of Ks
     ax1 = Axis(
         f[1, 1],
-        xlabel = L"t \Delta / \pi",
+        xlabel = L"\omega_c t",
         ylabel = L"\text{Re}(K_{%$(row_idx)%$(col_idx)})",
     )
     lines!(ax1, ts, ReKs, label = L"T=%$(config.temperature),\,\text{s}=%$(config.a[3])")
@@ -143,7 +121,7 @@ function plot_Ks(dirdata::String, row_idx, col_idx; tmax = nothing)
     # Imaginary part of Ks
     ax2 = Axis(
         f[2, 1],
-        xlabel = L"t \Delta / \pi",
+        xlabel = L"\omega_c t",
         ylabel = L"\text{Im}(K_{%$(row_idx)%$(col_idx)})",
     )
     lines!(ax2, ts, ImKs, label = L"T=%$(config.temperature),\,\text{s}=%$(config.a[3])")

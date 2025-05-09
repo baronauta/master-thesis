@@ -23,21 +23,20 @@
 # ─────────────────────────────────────────────────────────────
 
 """
-    plot_chain_occupation(dirdata::String, t_scaled::Real)
+    plot_chain_occupation(dirdata::String, t::Real)
 
-Plot the chain site occupations ⟨nᵢ⟩ at a given scaled time `t_scaled` using data from `dirdata`.
+Plot the chain site occupations ⟨nᵢ⟩ at a given scaled time `t` using data from `dirdata`.
 """
-function plot_chain_occupation(dirdata::String, t_scaled::Real)
+function plot_chain_occupation(dirdata::String, t::Real)
     # Collect data
     data = chain_occupation(dirdata)
     sites = data.sites
     ns = data.ns
-    # Time scaled by Δ / π (for labels)
-    config = loadconfig(dirdata * "/config.json")
-    ts = _scalets(data.time, config.Delta)
+    # Time (for labels)
+    ts = data.time
 
-    # Find the index of the closest ts to t_scaled
-    diffs = abs.(ts .- t_scaled)
+    # Find the index of the closest ts to `t`
+    diffs = abs.(ts .- t)
     t_idx = argmin(diffs)  # index of closest time
 
     # Extract corresponding values
@@ -60,11 +59,11 @@ function plot_chain_occupation(dirdata::String, t_scaled::Real)
 end
 
 """
-    plot_envmodes_occupation(dirdata::String, t_scaled::Real)
+    plot_envmodes_occupation(dirdata::String, t::Real)
 
-Plot environment mode occupations ⟨n_ω⟩ at a given scaled time `t_scaled`, with spectral density and frequency transitions.
+Plot environment mode occupations ⟨n_ω⟩ at a given scaled time `t`, with spectral density and frequency transitions.
 """
-function plot_envmodes_occupation(dirdata::String, t_scaled::Real)
+function plot_envmodes_occupation(dirdata::String, t::Real)
     # Collect data
     (rawdata, header) = readdlm("$dirdata/envmodes_data.dat", ',', Float64, header = true)
     meastime = rawdata[:, 1]
@@ -83,12 +82,11 @@ function plot_envmodes_occupation(dirdata::String, t_scaled::Real)
     # ωs' = (E+ - E-)/ħ with E± eigvals of Ks.
     freqs = _effective_freqs(dirdata, meastime)
 
-    # Time scaled by Δ / π (for labels)
-    config = loadconfig(dirdata * "/config.json")
-    ts = _scalets(data.time, config.Delta)
+    # Time (for labels)
+    ts = data.time
 
-    # Find the index of the closest ts to t_scaled
-    diffs = abs.(ts .- t_scaled)
+    # Find the index of the closest ts to `t`
+    diffs = abs.(ts .- t)
     t_idx = argmin(diffs)  # index of closest time
 
     # Extract corresponding values
@@ -150,8 +148,8 @@ function plot_transitionfreqs(dirdata::String; tmax = nothing)
     meastime = rawdata[:, 1]
     freqs_Ks = effective_freqs(dirdata, meastime)
 
-    # xs: time scaled by Δ / π
-    ts = _scalets(meastime, config.Delta)
+    # xs: time
+    ts = meastime
 
     if tmax !== nothing
         # Shorten time domain
@@ -164,7 +162,7 @@ function plot_transitionfreqs(dirdata::String; tmax = nothing)
 
     ax = Axis(
         f[1, 1],
-        xlabel = L"t \Delta / \pi",
+        xlabel = L"\omega_c t",
         ylabel = L"\text{Transition frequency}\;\omega",
     )
     # Hs eigenvalues
@@ -210,14 +208,13 @@ end
 # ─────────────────────────────────────────────────────────────
 
 function animate_chain_occupation(dirdata::String, outdir::String)
-
+    config = loadconfig(dirdata*"/config.JSON")
     # 1. Collect data
     data = chain_occupation(dirdata)
     sites = data.sites
     ns = data.ns
-    # Time scaled by Δ / π (for labels)
-    config = loadconfig(dirdata * "/config.json")
-    ts = round.(_scalets(data.time, config.Delta), digits = 1)
+    # Time
+    ts = round.(data.time, digits = 1)
     # Stepping function that returns the new data, here simply
     # progress the index `i`.
     function progress_for_one_step!(i, ns, ts)
@@ -232,7 +229,7 @@ function animate_chain_occupation(dirdata::String, outdir::String)
     obs_ys = Observable(ns[1])
     obs_time = Observable(ts[1])
     # Text for the tile, using `@lift` it will be updated runtine.
-    text = @lift("tΔ/π = $($obs_time)")
+    text = @lift("t = $($obs_time)")
 
     # 3. Plot the `Observable`s and any other static elements   
     fig = Figure()
@@ -267,36 +264,32 @@ function animate_chain_occupation(dirdata::String, outdir::String)
 
     # 5. Save in a .mp4 file
     frames = 1:length(ts)-1
-    record(fig, "$outdir/chain_occupation.mp4", frames; framerate = 60) do i
+    record(fig, "$outdir/chain_occupation.mp4", frames; framerate = 30) do i
         animstep!(i, ns, ts, obs_ys, obs_time)
     end
 
 end
 
-function animate_envmodes_occupation(
-    dirdata::String,
-    outdir::String;
-    xmin = nothing,
-    xmax = nothing,
-)
+function animate_envmodes_occupation(dirdata::String, outdir::String)
+    config = loadconfig(dirdata * "/config.JSON")
 
     # 1. Collect data
+    # Normal modes (xs), modes occupation (ns) and time for labels (ts)
+    (rawdata, header) = readdlm("$dirdata/envmodes_modes.dat", ',', Float64, header = true)
+    modes = rawdata[:] # flatten from Matrix to Vector
     (rawdata, header) = readdlm("$dirdata/envmodes_data.dat", ',', Float64, header = true)
     meastime = rawdata[:, 1]
+    ts = round.(meastime, digits = 1)
     ns = rawdata[:, 2:end]
-    (rawdata, header) = readdlm("$dirdata/envmodes_modes.dat", ',', Float64, header = true)
-    modes = rawdata[:]
-    # Time scaled by Δ / π (for labels)
-    config = loadconfig(dirdata * "/config.json")
-    ts = round.(_scalets(meastime, config.Delta), digits = 1)
+    ns_max =  maximum(ns)
     # Thermalized spectral density function for reference
-    sdfx, sdfy = thermal_sdf(dirdata * "/config.json")
+    sdfx = collect(range(config.domain..., 1000))
+    sdfy = [thermal_ohmic_sdf(x, SpectralDensityParams(config.a[1], config.a[3], config.a[2]), config.temperature) for x in sdfx]
+    sdfy = sdfy ./ maximum(sdfy) .* 1 / 10 * ns_max # rescale sdf (it is just for reference)
     # Frequency transition for Hs (bare system Hamiltonian):
     # Hs = ϵ σz + Δ σx → E± = √(ϵ^2+Δ^2) eigvals of Hs,
     # frequency transition is ωs = (E+ - E-)/ħ = 2√(ϵ^2+Δ^2).
-    Delta = config.Delta
-    epsilon = config.epsilon
-    ωs = 2 * sqrt(epsilon^2 + Delta^2)
+    ωs = 2 * sqrt(config.epsilon^2 + config.Delta^2)
     # Frequency transition of Ks (effective Hamiltonian):
     # ωs' = (E+ - E-)/ħ with E± eigvals of Ks.
     freq = effective_freqs(dirdata, meastime)
@@ -317,8 +310,8 @@ function animate_envmodes_occupation(
     obs_time = Observable(ts[1])
     obs_freq = Observable(freq[1])
     obs_negfreq = Observable(negfreq[1])
-    # Text for the tile, using `@lift` it will be updated runtine.
-    text = @lift("tΔ/π = $($obs_time)")
+    # Text for the tile, using `@lift` it will be updated runtime
+    text = @lift("t = $($obs_time)")
 
     # 3. Plot the `Observable`s and any other static elements   
     fig = Figure()
@@ -329,17 +322,12 @@ function animate_envmodes_occupation(
         title = text,
     )
 
-    # Set ylims considering the maximum value in `ns`
-    ymax = maximum(ns) * 1.1  # Add 10% buffer for visibility
-    ylims!(ax, 0, ymax)
-    # Rescale thermalized sdf (it is just for reference)
-    sdfy = sdfy ./ maximum(sdfy) .* 1 / 10 * ymax
-
-    if xmin !== nothing && xmax !== nothing
-        xlims!(ax, xmin, xmax)
-    else
-        xlims!(ax, minimum(xs), maximum(xs))
-    end
+    # Set y-axis limits: consider `ns_max =  maximum(ns)`
+    ylims!(ax, 0, ns_max * 11/10) # add 10% for better visibility
+    # Set x-axis limits: use provided values or auto-trim 10% at each end to reduce edge artifacts
+    xmin, xmax = minimum(xs), maximum(xs)
+    dx = xmax - xmin
+    xlims!(ax, xmin + 0.01*dx, xmax - 0.01*dx)
 
     lines!(
         ax,
@@ -351,7 +339,7 @@ function animate_envmodes_occupation(
     # Fill space under the plot
     band!(ax, xs, zeros(length(xs)), obs_ys, color = (:darkorange1, 0.2))
     # Sdf for reference
-    lines!(ax, sdfx, sdfy, color = :gray70)
+    lines!(ax, sdfx, sdfy, color = :gray)
     # Vertical lines indicating eigenvalues of the bare system Hs
     vlines!(
         ax,
@@ -386,13 +374,8 @@ function animate_envmodes_occupation(
     end
 
     # 5. Save in a .mp4 file
-    if xmin !== nothing && xmax !== nothing
-        outpath = "$outdir/envmodes_occupation_zoom_$(xmin)_$(xmax).mp4"
-    else
-        outpath = "$outdir/envmodes_occupation.mp4"
-    end
     frames = 1:length(ts)-1
-    record(fig, outpath, frames; framerate = 60) do i
+    record(fig, "$outdir/envmodes_occupation.mp4", frames; framerate = 30) do i
         animstep!(i, ns, ts, freq, negfreq, obs_ys, obs_time, obs_freq, obs_negfreq)
     end
 
