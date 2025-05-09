@@ -333,8 +333,8 @@ Diagonalize extended chain Hamiltonian to obtain normal-mode frequencies and tra
 - `D`: Diagonal matrix of mode frequencies.
 - `P`: Unitary transformation matrix (eigenvectors).
 """
-function _normalmodes(filename::String; extendN = 2000)
-    # Chain Hamiltonian for the env is H_E = c† A c, where A is a tridiagonal matrix:
+function _normalmodes(filename::String; extendN = 500)
+    # Chain Hamiltonian for the env is H_E = c† A c, where A is a three-diagonal matrix:
     # major diagonal formed by frequencies ωn (n = 0...N-1),
     # sub-diagonal and super-diagonal formed by couplings κn (n = 1...N-1).
     params = JSON.parsefile(filename)
@@ -348,15 +348,18 @@ function _normalmodes(filename::String; extendN = 2000)
     k = coeff.couplings[2:end]
     A = Tridiagonal(k, f, k)
 
-    # Any Hermitian matrix can be diagonalized by a unitary matrix.
-    # A = U† D U, with D diagonal matrix and U unitary matrix. Let P = U†.
+    # Any Hermitian (here also real) matrix can be diagonalized by a unitary matrix.
+    #   A = U D Uᵀ,
+    # with D being a diagonal matrix and U  being unitary matrix, Uᵀ=U⁻¹=U†.
     # Eigensolver:
-    # E.values contains the eigenvalues (diagonal entries of D);
-    # E.vectors contains the eigenvectors (columns of P).
-    E = eigen(A)
-    D = Diagonal(E.values)
-    P = E.vectors
-    return D, P
+    # F.values contains the eigenvalues (diagonal entries of D);
+    # F.vectors contains the eigenvectors (columns of U).
+    # Note: matrix A can be reconstructed as F.vectors * Diagonal(F.values) * inv(F.vectors).
+    # Note: since U=F.vectors unitary, I have inv(U) = transpose(U) = U'
+    F = eigen(A)
+    D = Diagonal(F.values)
+    U = F.vectors
+    return D, U
 end
 
 """
@@ -369,44 +372,43 @@ Compute occupation of environment normal modes and write to CSV.
 # Arguments
 - `dirdata::String`: path to directory for measurements and output.
 """
-function envmodes_occupation(dirdata::String; nframes=10000)
-    # The chain Hamiltonian of the environment
-    #   H_E = c† A c
-    # is quadratic in c (vector) with matrix A being tridiagonal.
-    # Diagonalize A:
-    #   A = PDP^(-1) = U†DU, D diagonal and U†:=P.
-    # Normal modes decomposition of H_E:
-    #   H_E = t† D t, with t := U c. 
-    # Occupation number of the new modes: 
-    #   <tᵢ† tᵢ> = ∑j P[i-1,j-1]^2 * <cⱼ† cⱼ>.
-    # Modes numbering is i = 2...NN+1, P is a square matrix with indexes 1...NN.
-    # Only <c†{i}c{i}>, with i from 1 to N+1, are measured, fill the others,
-    # i.e. i from N+2 to NN+1, with 0s entries: to do so
-    # choose extendN for computing normal modes for a longer chain
-    # with NN modes.
-    D, P = _normalmodes(dirdata * "/config.json"; extendN = 500)
+function envmodes_occupation(dirdata::String; NN = 700, nframes=10000)
+    # Any Hermitian (here also real) matrix can be diagonalized by a unitary matrix.
+    #   A = U D Uᵀ,
+    # with D being a diagonal matrix and U  being unitary matrix, Uᵀ=U⁻¹=U†.
+    # (Optional)
+    # Extend fictitiously the chian with 0s entries; chain length: N ↦ NN.
+    D, U = _normalmodes(dirdata * "/config.json"; extendN = NN)
     modes = diag(D)
     NN = length(modes)
+    # I prefer to see A = U† D U. In fact, given Hₑ = c† A c 
+    # with c is vector of annihilation operators,
+    # normal modes decomposition of Hₑ is straightforwardly found as
+    #   Hₑ = t† D t, with t:=Uc, t†:=c†U†
+    # Occupation number of the new modes: 
+    #   <tₙ† tₙ> = ∑k U[k,n]^2 * <cₖ† cₖ†>, with k = 0,...,N-1.
     
     # MPS of sys⊗env: environment sites from {2} to {N+1}
-    # <cⱼ† cⱼ> = meas["N{i}_re"] with j from 2 to N+1,
-    # <cⱼ† cⱼ> = 0 with j from N+2 to NN+1
+    # <cⱼ† cⱼ> = meas["N{i}_re"] with i from 2 to N+1,
+    # <cⱼ† cⱼ> = 0 with i from N+2 to NN+1
     meas = get_measurements(dirdata * "/measurements_N.dat", "N")
-    c_re_values = [get(meas.result, "N{$j}_re", zeros(length(meas.time))) for j = 2:NN+1]
+    c_values = [get(meas.result, "N{$i}_re", zeros(length(meas.time))) for i = 2:NN+1]
 
-    # Precompute P^2 values (squared coefficients for each mode)
-    P_squared = [P[j-1, i-1]^2 for j = 2:NN+1, i = 2:NN+1]
+    # Precompute U^2 values (squared coefficients for each mode)
+    U_squared = [U[k,n]^2 for k = 1:NN, n = 1:NN]
 
     # Set time step indices for animation
     T = length(meas.time)
     timesampled_indices = round.(Int, LinRange(1, T, min(nframes, T)))
 
     # Compute occupation numbers
-    data = [
-        [
-            sum(P_squared[j, i] * c_re_values[j][t] for j = 1:NN) for i = 1:NN
-        ] for t in timesampled_indices
-    ]
+    data = Vector{Vector{Float64}}()
+    for t in timesampled_indices
+        t_values = [
+            sum(U_squared[k, n] * c_values[k][t] for k = 1:NN) for n = 1:NN
+        ]
+        push!(data, t_values)
+    end
 
     # Write results to files
     open("$dirdata/envmodes_data.dat", "w") do io
