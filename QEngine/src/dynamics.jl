@@ -359,17 +359,17 @@ function _normalmodes(filename::String; extendN = 500)
     A = Tridiagonal(k, f, k)
 
     # Any Hermitian (here also real) matrix can be diagonalized by a unitary matrix.
-    #   A = U D Uᵀ,
-    # with D being a diagonal matrix and U  being unitary matrix, Uᵀ=U⁻¹=U†.
+    #   A = P D Pᵀ,
+    # with D being a diagonal matrix and P being unitary matrix, Pᵀ=P⁻¹=P†.
     # Eigensolver:
     # F.values contains the eigenvalues (diagonal entries of D);
-    # F.vectors contains the eigenvectors (columns of U).
+    # F.vectors contains the eigenvectors (columns of P).
     # Note: matrix A can be reconstructed as F.vectors * Diagonal(F.values) * inv(F.vectors).
-    # Note: since U=F.vectors unitary, I have inv(U) = transpose(U) = U'
+    # Note: because P (i.e. F.vectors) is unitary, I have inv(P) = transpose(P) = P'
     F = eigen(A)
     D = Diagonal(F.values)
-    U = F.vectors
-    return D, U
+    P = F.vectors
+    return D, P
 end
 
 
@@ -380,7 +380,8 @@ function envmodes_occupation(meastime, U_squared, c_site_occupations)
     for n in 1:NN  # loop over modes
         mode_values = Float64[]
         for t in 1:T  # loop over time
-            occ = sum(U_squared[k, n] * c_site_occupations[k][t] for k in 1:NN)
+            # <tₙ†tₙ> = < (∑ₖ Uₙₖ cₖ)† (∑ⱼ Uₙⱼ cⱼ) > = ∑ₖ |Uₙₖ|² < cₖ† cₖ >
+            occ = sum(U_squared[n, k] * c_site_occupations[k][t] for k in 1:NN)
             push!(mode_values, occ)
         end
         push!(mode_occupations, mode_values)
@@ -400,21 +401,22 @@ Compute occupation of environment normal modes and write to CSV.
 """
 function envmodes_occupation(dirdata::String; extendN = 700)
     # Any Hermitian (here also real) matrix can be diagonalized by a unitary matrix.
-    #   A = U D Uᵀ,
-    # with D being a diagonal matrix and U  being unitary matrix, Uᵀ=U⁻¹=U†.
+    #   A = P D Pᵀ,
+    # with D being a diagonal matrix and P being unitary matrix, Pᵀ=P⁻¹=P†.
     # (Optional)
     # Extend fictitiously the chain with 0s entries; chain length: N ↦ NN.
-    D, U = _normalmodes(dirdata * "/config.json"; extendN = extendN)
+    D, P = _normalmodes(dirdata * "/config.json"; extendN = extendN)
     modes = diag(D)
     NN = length(modes)
-    # I prefer to see A = U† D U. In fact, given Hₑ = c† A c 
-    # with c is vector of annihilation operators,
+    # I prefer to see A = U† D U. Define U = Pᵀ. 
+    U = transpose(P)
+    # In fact, given Hₑ = c† A c with c is vector of annihilation operators,
     # normal modes decomposition of Hₑ is straightforwardly found as
-    #   Hₑ = t† D t, with t:=Uc, t†:=c†U†
-    # Occupation number of the new modes: 
-    #   <tₙ† tₙ> = ∑k U[k,n]^2 * <cₖ† cₖ†>, with k = 0,...,N-1.
-    U = transpose(U)
-    # Precompute U^2 values (squared coefficients for each mode)
+    #   Hₑ = c† (U† D U) c =  t† D t,
+    # with t:=Uc, t†:=c†U†. Thus, occupation number of the new modes:
+    #   <tₙ† tₙ> = ∑ₖ U[n,k]^2 * <cₖ† cₖ†>, with k = 0,...,N-1.
+
+    # Precompute U² values (squared coefficients for each mode)
     U_squared = U.^2
 
     # MPS of sys⊗env: environment sites from {2} to {N+1}
@@ -480,7 +482,7 @@ function effective_freqs(dirdata::String, time::Vector{Float64})
         t in time
     ]
     Ks = effective_hamiltonian.Ks[inds]
-    # Print error message if sliced `ks` length doesn't match
+    # Print error message if sliced `Ks` length doesn't match
     # `time` lenght.
     if length(Ks) !== length(time)
         println("Error: time points mismatch!")
