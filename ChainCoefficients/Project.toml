@@ -1,0 +1,16 @@
+name = "ChainCoefficients"
+uuid = "d32c4d0b-0f61-4c2f-9428-fddc33bee8d9"
+authors = ["Andrea Baroffio <andrea.baroff2000@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+Integrals = "de52edbc-65ea-441a-8357-d3a637375a31"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+MPSDynamics = "8fc8f346-e1eb-498f-94db-02ffe92d8134"
+
+[compat]
+DelimitedFiles = "1.9.1"
+Integrals = "4.5.0"
+JSON = "0.21.4"
+MPSDynamics = "1.1.0"

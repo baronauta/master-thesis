@@ -1,24 +1,32 @@
 module QEngine
 
-import MPSTimeEvolution: ExpValueCallback, LocalOperator, growMPS, growMPS!, tdvp1!
-
-using DelimitedFiles
-using ITensorMPS
-using ITensors
-using JSON
+using DelimitedFiles    # write and read files
+using JSON              # read JSON file
 using LinearAlgebra
-using TEDOPA
+using CairoMakie        # plot
+using GLMakie           # animated plot
 
-export σ0, σ1, σ2, σ3, paulimatrices, canonical_op_basis
+export σ0, σ1, σ2, σ3
+export paulimatrices, canonical_op_basis
+export densitymatrix, computeKs, write_Ks
+export envmodes_occupation, write_envmodes
+
+export read_config_sdf, read_config_simul
+export read_freqs, read_coups
+export read_time, read_state
+export read_measN, read_modes, read_occupations
+export read_Ks
+export read_sdf, read_thermalized_sdf
+
+export plot_state
+export plot_Ks
+export animate_chain, animate_envmodes
+
 include("constants.jl")
-
-include("mps_spin_boson.jl")
-
-export chain_coefficients,
-    suggest_dt_N, loadconfig, tomodynamics, sysenv_dynamics, get_measurements
-include("simulation.jl")
-
-export computeKs, computeUs, chain_occupation, envmodes_occupation, read_envmodes_occupation, effective_freqs
-include("dynamics.jl")
+include("read.jl")
+include("tls_dynamics.jl")
+include("env_dynamics.jl")
+include("tls_plot.jl")
+include("env_plot.jl")
 
 end

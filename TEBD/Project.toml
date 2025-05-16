@@ -1,0 +1,20 @@
+name = "TEBD"
+uuid = "f2a6880c-4fce-438a-bff7-50b06065b66e"
+authors = ["Andrea Baroffio <andrea.baroff2000@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+ITensorMPS = "0d1a4710-d33b-49a5-8f18-73bdf49b47e2"
+ITensors = "9136182c-28ba-11e9-034c-db9fb085ebd5"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MKL = "33e6dc65-8f57-5167-99aa-e5a354878fb2"
+
+[compat]
+DelimitedFiles = "1.9.1"
+ITensorMPS = "0.3.17"
+ITensors = "0.9.6"
+JSON = "0.21.4"
+LinearAlgebra = "1.11.0"
+MKL = "0.8.0"
