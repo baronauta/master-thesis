@@ -100,11 +100,16 @@ function animate_chain(time::Vector{Float64}, measN::Matrix{Float64}, β::Float6
 
 end
 
-
-function animate_envmodes(time::Vector{Float64}, modes::Vector{Float64}, occupations::Matrix{Float64}, β::Float64, s::Float64, outdir::AbstractString; xmin=-1, xmax=1)
+function animate_envmodes(time::Vector{Float64}, modes::Vector{Float64}, occupations::Matrix{Float64}, J, ωs::Float64, β::Float64, s::Float64, outdir::AbstractString; xmin=-1, xmax=1)
 
     # 1. Collect data
     ts = round.(time, digits = 1)
+    # Thermalized sdf for reference
+    support = [minimum(modes), maximum(modes)]
+    sdfx = collect(range(support..., 1000))
+    sdfy = [ J(x) for x in sdfx ]
+    scaled_sdfy = sdfy ./ maximum(sdfy) .* (0.5 * maximum(occupations[400,:]))
+    
     # Stepping function that returns the new data
     function progress_for_one_step!(i, ys, labels)
         i += 1
@@ -139,6 +144,18 @@ function animate_envmodes(time::Vector{Float64}, modes::Vector{Float64}, occupat
     )
     # Fill space under the plot
     band!(ax, modes, zeros(length(modes)), obs_ys, color = (:darkorange1, 0.2))
+    # Sdf for reference
+    lines!(ax, sdfx, scaled_sdfy, color = :gray, label = L"J(\omega)")
+    # Vertical lines indicating eigenvalues of the bare system Hs
+    vlines!(
+        ax,
+        ωs,
+        color = (:purple, 0.8),
+        linewidth = 1,
+        linestyle = :dash,
+        label = L"\pm\omega_s",
+    )
+    vlines!(ax, -ωs, color = (:purple, 0.8), linewidth = 1, linestyle = :dash)
 
     axislegend(position = :rt)
 
@@ -256,3 +273,4 @@ function animate_envmodes(time::Vector{Float64}, modes::Vector{Float64}, occupat
     end
 
 end
+

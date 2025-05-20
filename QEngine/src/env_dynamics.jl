@@ -12,29 +12,15 @@ function normalmodes(freqs::Vector{Float64}, coups::Vector{Float64})
     # Eigensolver:
     # F.values contains the eigenvalues (diagonal entries of D);
     # F.vectors contains the eigenvectors (columns of P).
-    # Note: matrix A can be reconstructed as F.vectors * Diagonal(F.values) * inv(F.vectors).
-    # Note: because P (i.e. F.vectors) is unitary, I have inv(P) = transpose(P) = P'
     F = eigen(A)
     D = Diagonal(F.values)
     P = F.vectors
+    # Check: A eigvec = eigval eigvecm
+    # i.e. all([A*P[:,i] ≈ F.values[i] * P[:,i] for i in 1:length(freqs)]) must be true.
+    # Check: A = P D Pᵀ
+    # i.e A ≈ F.vectors * Diagonal(F.values) * F.vectors' must be true;
+    # because P (i.e. F.vectors) is unitary, I have inv(P) = transpose(P) = P'.
     return D, P
-end
-
-function envmodes_occupation(U_squared::Matrix{Float64}, measN::Matrix{Float64})
-    nchain = size(U_squared, 1)  # number of modes
-    tt = size(measN, 1)          # number of time steps
-
-    occupations = zeros(Float64, tt, nchain)  # time × mode
-
-    for n = 1:nchain  # loop over modes (columns)
-        for t = 1:tt  # loop over time (rows)
-            # Compute occupation of mode `n` at time `t`
-            # <tₙ†tₙ> = < (∑ₖ Uₙₖ cₖ)† (∑ⱼ Uₙⱼ cⱼ) > = ∑ₖ |Uₙₖ|² < cₖ† cₖ >
-            occupations[t, n] = sum(U_squared[n, k] * measN[t, k] for k = 1:nchain)
-        end
-    end
-
-    return occupations
 end
 
 function envmodes_occupation(freqs::Vector{Float64}, coups::Vector{Float64}, measN::Matrix{Float64})
@@ -54,9 +40,23 @@ function envmodes_occupation(freqs::Vector{Float64}, coups::Vector{Float64}, mea
     # Precompute U² values (squared coefficients for each mode)
     U_squared = U .^ 2
 
-    # measN[time,modes]:
-    # for a fixed time t_idx, I have measN[t_idx,k] = <cₖ† cₖ>
-    occupations = envmodes_occupation(U_squared, measN)
+    # measN[time, modes], for a fixed time t_idx, I have measN[t_idx,k] = <cₖ† cₖ>.
+    # I fictitiously enlarge the chain, see Riva et al.: PRB 108, 195138 (2023), Appendix E.
+    if size(measN, 2) < size(U_squared, 2)
+        missing_cols = size(U_squared, 2) - size(measN, 2)
+        measN = hcat(measN, zeros(size(measN, 1), missing_cols))
+    end
+
+    nchain = size(U_squared, 1)  # number of modes
+    tt = size(measN, 1)          # number of time steps
+    occupations = zeros(Float64, tt, nchain)  # time × mode
+    for n = 1:nchain  # loop over modes (columns)
+        for t = 1:tt  # loop over time (rows)
+            # Compute occupation of mode `n` at time `t`
+            # <tₙ†tₙ> = < (∑ₖ Uₙₖ cₖ)† (∑ⱼ Uₙⱼ cⱼ) > = ∑ₖ |Uₙₖ|² < cₖ† cₖ >
+            occupations[t, n] = sum(U_squared[n, k] * measN[t, k] for k = 1:nchain)
+        end
+    end
 
     return modes, occupations
 end

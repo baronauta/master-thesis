@@ -6,5 +6,5 @@ env
 tomo
 script.sh
 
-data*
+hc*
 misc

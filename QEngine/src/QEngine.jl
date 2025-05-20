@@ -11,16 +11,16 @@ export paulimatrices, canonical_op_basis
 export densitymatrix, computeKs, write_Ks
 export envmodes_occupation, write_envmodes
 
-export read_config_sdf, read_config_simul
-export read_freqs, read_coups
-export read_time, read_state
-export read_measN, read_modes, read_occupations
+export read_state, read_measN
+export read_modes, read_occupations
 export read_Ks
 export read_sdf, read_thermalized_sdf
 
 export plot_state
 export plot_Ks
 export animate_chain, animate_envmodes
+
+export read_thermalized_sdf
 
 include("constants.jl")
 include("read.jl")

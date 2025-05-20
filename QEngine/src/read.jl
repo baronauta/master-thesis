@@ -1,23 +1,3 @@
-function read_config_sdf(dir::AbstractString)
-    return JSON.parsefile(joinpath(dir, "config_sdf.json"))
-end
-
-function read_config_simul(dir::AbstractString)
-    return JSON.parsefile(joinpath(dir, "config_simul.json"))
-end
-
-function read_freqs(dir::AbstractString)
-    return readdlm(joinpath(dir, "freqs.csv"), '\n', Float64)[:, 1]
-end
-
-function read_coups(dir::AbstractString)
-    return readdlm(joinpath(dir, "coups.csv"), '\n', Float64)[:, 1]
-end
-
-function read_time(dir::AbstractString)
-    return readdlm(joinpath(dir, "time.dat"), '\n', Float64)[:, 1]
-end
-
 function read_state(dir::AbstractString, state::AbstractString)
     bloch_complex = readdlm(joinpath(dir, "meas_$state.dat"), ',', ComplexF64, '\n')
     return real.(bloch_complex)
@@ -45,6 +25,11 @@ function read_occupations(dir::AbstractString)
     return readdlm(joinpath(dir, "envmodes_occ.dat"), ',', Float64, '\n')
 end
 
+"Given J(ω), compute the thermalized spectral density function."
+function thermalize_sdf(x, sdf, β)
+    return 0.5 * (1 + coth(0.5 * x * β)) * sign(x) * sdf(abs(x))
+end
+
 function read_sdf(dict::Dict{String, Any})
     a = Float64.(dict["environment"]["spectral_density_parameters"])
     # retrieves a string representing the spectral density function formula
@@ -58,11 +43,7 @@ end
 
 function read_thermalized_sdf(dict::Dict{String, Any})
     sdf = read_sdf(dict)
+    β = dict["environment"]["β"]
     therm_sdf = x -> thermalize_sdf(x, sdf, β)
     return therm_sdf
-end
-
-"Given J(ω), compute the thermalized spectral density function."
-function thermalize_sdf(x, sdf, β)
-    return 0.5 * (1 + coth(0.5 * x * β)) * sign(x) * sdf(abs(x))
 end
