@@ -1,0 +1,17 @@
+{
+    "nquad": 5000,
+    "environment": {
+        "domain": [
+            0,
+            1
+        ],
+        "spectral_density_parameters": [
+            0.07957747154594766,
+            2.0,
+            1.0
+        ],
+        "spectral_density_function": "2 * a[1] * a[3] * (x/a[3])^a[2]",
+        "β": 2.0
+    },
+    "chain_length": 100
+}

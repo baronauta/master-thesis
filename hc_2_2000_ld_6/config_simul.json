@@ -1,0 +1,21 @@
+{
+    "integration": {
+        "tmax": 100,
+        "measurement_step": 1,
+        "time_step": 0.04
+    },
+    "interaction": "X",
+    "chain": {
+        "local_dim": 6,
+        "size": 100
+    },
+    "qubit": {
+        "epsilon": 0.2,
+        "delta": 0.0
+    },
+    "mps": {
+        "cutoff": 1.0e-15,
+        "max_bond_dim": 120,
+        "min_bond_dim": 10
+    }
+}
