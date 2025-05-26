@@ -1,4 +1,4 @@
-using Revise
+# using Revise
 using Pkg
 Pkg.activate("./TEBD")
 
@@ -22,7 +22,7 @@ p = Dict(
     ),
     "chain" => Dict(
         "size" => 100,          # N = 2 * κ∞ * tmax, with κ∞ = ωmax / 2
-        "local_dim" => 10
+        "local_dim" => 6
     ),
     "integration" => Dict(
         "time_step" => 1 / 25,  # dt = 1 / (κ∞ * 50) = 1 / ωmax * 25

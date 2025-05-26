@@ -89,7 +89,7 @@ function plot_Ks(ts::Vector{Float64}, Ks::Vector{Matrix{ComplexF64}}, i::Integer
     if isnothing(outdir)
         display(fig)
     else
-        save(joinpath(outdir, "tomo$state.png"), fig)
+        save(joinpath(outdir, "Ks$(i)$(j).png"), fig)
     end
 
     return fig

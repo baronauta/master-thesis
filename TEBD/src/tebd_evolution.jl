@@ -93,7 +93,7 @@ function SpinBoson_evolution_TEBD(
     # - norm_<state>.dat for norm of the TLS;
     # - meas_N.dat for chain sites occupation;
     # - bondDims.dat for monitoring the bond dimension
-    ioTv  = open(joinpath(dir, "time.dat"), "w")
+    ioTv  = open(joinpath(dir, "time_$state.dat"), "w")
     ioTLS  = open(joinpath(dir, "meas_$state.dat"), "w")
     ioNormCheck = open(joinpath(dir, "norm_$state.dat"), "w")
 

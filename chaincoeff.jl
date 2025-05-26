@@ -6,12 +6,12 @@ using JSON
 using ChainCoefficients
 
 # Save to directory
-dir = "hc_2_2000_try"
+dir = "hc_0.5_2"
 mkpath(dir)
 
-s = 2.0                    # s=1 (Ohmic), s<1 (Sub-Ohmic), s>1 (Super-Ohmic)
+s = 0.5                     # s=1 (Ohmic), s<1 (Sub-Ohmic), s>1 (Super-Ohmic)
 ϵ, Δ = 0.2, 0.0             # Hs = ϵ/2 σz + Δ/2 σx, transition freq ωs=√ϵ²+Δ²
-α = 0.001 / sqrt(ϵ^2+Δ^2)^s  # Rescale: α → α/ωs^s 
+α = 0.01 / (π * sqrt(ϵ^2+Δ^2)^s)  # Rescale: α → α/(π ⋅ ωs^s) 
 
 # I am interested into the following sdf (a = [α, s, ωc], see below)
 hardcutOhmic = "2 * a[1] * a[3] * (x/a[3])^a[2]"
@@ -24,7 +24,7 @@ p = Dict(
         "spectral_density_parameters" => [α, s, 1.0],
         "spectral_density_function" => hardcutOhmic,
         "domain" => [0, 1],
-        "β" => 2000.0, # β=2.0 (T=0.5), β=2000.0 (T=0.0005)
+        "β" => 2.0, # β=2.0 (T=0.5), β=2000.0 (T=0.0005)
     ),
     "chain_length" => 100,
     "nquad" => 5000

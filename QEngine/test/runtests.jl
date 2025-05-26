@@ -2,9 +2,6 @@ using QEngine
 using LinearAlgebra
 using Test
 
-import QEngine: changebasis, A2Bmatrix, krausdecomposition
-import QEngine: envmodes_occupation
-
 @testset "Depolarizing channel" begin
 
     # Depolarizing channel: Φ(ρ) = (1-p) * ρ + p * I/2
@@ -23,7 +20,7 @@ import QEngine: envmodes_occupation
 
     p = 0.1
     Φ_pauli = depolarizing_channel_pauli(p)
-    Φ_canonical = changebasis(Φ_pauli)
+    Φ_canonical = QEngine.changebasis(Φ_pauli)
 
     # Compare action on a test state ρ
     ρ₊ = Matrix{ComplexF64}([0.5 0.5; 0.5 0.5])
@@ -36,8 +33,8 @@ import QEngine: envmodes_occupation
     # Kraus decomposition
     # Φ_canonical is an A-represention matrix of the quantum operation Φ,
     # kraus decomposition should be applied to B-represention matrix (Choi matrix).
-    choimatrix = reshape(A2Bmatrix * vec(Φ_canonical), (4, 4))
-    eigvals, krausoperators = krausdecomposition(choimatrix)
+    choimatrix = reshape(QEngine.A2Bmatrix * vec(Φ_canonical), (4, 4))
+    eigvals, krausoperators = QEngine.krausdecomposition(choimatrix)
     # Check: λₖ ∈ Real 
     @test all(isreal, eigvals)
     # Check: ∑ₖ λₖ Eₖ† Eₖ = I
@@ -54,32 +51,55 @@ import QEngine: envmodes_occupation
 end
 
 @testset "Normal modes occupation" begin
+    # Consider a chain of 4 sites with the given frequencies and couplings
+    freqs = [
+        0.7499999986477128,
+        0.5833333202609593,
+        0.5416666134711797,
+        0.524999851201351,
+    ]
+    coups = [
+        0.2303294331885381,
+        0.1936491697544971,
+        0.22537448194777276,
+        0.23622784163992785,
+    ]
+    # Measurements of N on each sites for t = 1, 2, 3,
+    # at t=1 each site is in the vaccum state.
+    # measN is a matrix of dimension time × sites, i.e. 3 × 4.
+    measN = [
+        0.0 0.0 0.0 0.0;
+        10.0 0.0 0.0 0.0;
+        20.0 3.0 0.1 0.0
+    ]
 
-    A = [2.0 1.0 0.0; 1.0 2.0 1.0; 0.0 1.0 2.0]
-    # A = Uᵀ D U
-    e1, e2, e3 = 0.5857864376269073, 2.0000000000000018, 3.414213562373095
-    D = Diagonal([e1, e2, e3])
-    E1 = [-0.5, 0.7071067811865476, -0.5]
-    E2 = [-0.7071067811865476, 0.0, 0.7071067811865476]
-    E3 = [0.5, 0.7071067811865476, 0.5]
-    U = [E1 E2 E3] # U columns are E1, E2, E3
-    reconstructed_A = U * D * transpose(U)
-    @test isapprox(A, reconstructed_A; atol = 1e-10, rtol = 1e-8)
-    c_site_occupations = [ 1.0 3.0 0.0; 2.0 0.0 0.0]
-    # <tₙ† tₙ> = ∑k U[k,n]^2 * <cₖ† cₖ†>
-    t1 = [
-        U[1, 1]^2 * c1[1] + U[2, 1]^2 * c2[1] + U[3, 1]^2 * c3[1],
-        U[1, 1]^2 * c1[2] + U[2, 1]^2 * c2[2] + U[3, 1]^2 * c3[2],
-    ]
-    t2 = [
-        U[1, 2]^2 * c1[1] + U[2, 2]^2 * c2[1] + U[3, 2]^2 * c3[1],
-        U[1, 2]^2 * c1[2] + U[2, 2]^2 * c2[2] + U[3, 2]^2 * c3[2],
-    ]
-    t3 = [
-        U[1, 3]^2 * c1[1] + U[2, 3]^2 * c2[1] + U[3, 3]^2 * c3[1],
-        U[1, 3]^2 * c1[2] + U[2, 3]^2 * c2[2] + U[3, 3]^2 * c3[2],
-    ]
-    t_site_occupation_expected = hcat(t1, t2, t3)
-    U_squared = U .^ 2
-    @test envmodes_occupation(U_squared, c_site_occupations) ≈ t_site_occupation_expected
+    # A = Tridiagonal(coups, freqs, coups) where coups = coups[2:end],
+    # i.e. exclude the coupling sys-env.
+    k = coups[2:end]
+    A = Tridiagonal(k, freqs, k)
+    # Diagonalize A, i.e. A = P D P†.
+    # D is a diagonal matrix whose entries are the eigenvals of A.
+    # P is a unitary matrix whose columns are the eigenvectors of A.
+    D, P = QEngine.normalmodes(freqs, coups)
+    # Check A = P D P†
+    @test A ≈ P * D * P'
+    # A eigvec = eigval eigvec
+    @test all([A * P[:,i] ≈ D[i,i] * P[:,i] for i in 1:length(freqs)])
+    # P is unitary, so Pᵀ=P⁻¹=P†
+    @test transpose(P) ≈ P'
+    @test inv(P) ≈ P'
+    # I prefer to see A = U† D U where U = P†.
+    U = transpose(P)
+    @test A ≈ U' * D * U
+
+    modes, occupation = QEngine.envmodes_occupation(freqs, coups, measN)
+    @test modes ≈ diag(D)
+    # t=1 (first row) the sites are in the vacuum state,
+    # then also normal modes are in the vacuum state
+    @test occupation[1,:] ≈ [0.0; 0.0; 0.0; 0.0]
+    # t=2: <tₙ†tₙ> = ∑ₖ |Uₙₖ|² <cₖ†cₖ> = |Uₙ₁|² <c₁†c₁> because only <c₁†c₁>≠0
+    Un1 = U[:,1]
+    @test occupation[2,:] ≈ (Un1 .^2) * measN[2,1]
+    # t=3: <tₙ†tₙ> = ∑ₖ |Uₙₖ|² <cₖ†cₖ> for k=1,2,3
+    @test occupation[3,:] ≈ (U[:,1] .^2) * measN[3,1] + (U[:,2] .^2) * measN[3,2] + (U[:,3] .^2) * measN[3,3]
 end

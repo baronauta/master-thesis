@@ -15,11 +15,6 @@ function normalmodes(freqs::Vector{Float64}, coups::Vector{Float64})
     F = eigen(A)
     D = Diagonal(F.values)
     P = F.vectors
-    # Check: A eigvec = eigval eigvecm
-    # i.e. all([A*P[:,i] ≈ F.values[i] * P[:,i] for i in 1:length(freqs)]) must be true.
-    # Check: A = P D Pᵀ
-    # i.e A ≈ F.vectors * Diagonal(F.values) * F.vectors' must be true;
-    # because P (i.e. F.vectors) is unitary, I have inv(P) = transpose(P) = P'.
     return D, P
 end
 
@@ -57,17 +52,25 @@ function envmodes_occupation(freqs::Vector{Float64}, coups::Vector{Float64}, mea
             occupations[t, n] = sum(U_squared[n, k] * measN[t, k] for k = 1:nchain)
         end
     end
-
     return modes, occupations
 end
 
-function write_envmodes(dir::AbstractString, modes::Vector{Float64}, occupations::Matrix{Float64})
-    # Write to a file normal modes 
-    open(joinpath(dir, "envmodes_modes.dat"), "w") do io
-        writedlm(io, modes, ',')
-    end
-    # Write to a file normal modes occupation (time × modes)
-    open(joinpath(dir, "envmodes_occ.dat"), "w") do io
-        writedlm(io, occupations, ',')
-    end
-end
+
+# function write_envmodes(dir::AbstractString, modes::Vector{Float64}, occupations::Matrix{Float64})
+#     # Write to a file normal modes 
+#     open(joinpath(dir, "envmodes_modes.dat"), "w") do io
+#         writedlm(io, modes, ',')
+#     end
+#     # Write to a file normal modes occupation (time × modes)
+#     open(joinpath(dir, "envmodes_occ.dat"), "w") do io
+#         writedlm(io, occupations, ',')
+#     end
+# end
+
+# function read_modes(dir::AbstractString)
+#     return readdlm(joinpath(dir, "envmodes_modes.dat"), '\n', Float64)[:, 1]
+# end
+
+# function read_occupations(dir::AbstractString)
+#     return readdlm(joinpath(dir, "envmodes_occ.dat"), ',', Float64, '\n')
+# end

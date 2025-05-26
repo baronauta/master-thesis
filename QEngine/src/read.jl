@@ -17,14 +17,6 @@ function read_Ks(dir::AbstractString)
     return Ks
 end
 
-function read_modes(dir::AbstractString)
-    return readdlm(joinpath(dir, "envmodes_modes.dat"), '\n', Float64)[:, 1]
-end
-
-function read_occupations(dir::AbstractString)
-    return readdlm(joinpath(dir, "envmodes_occ.dat"), ',', Float64, '\n')
-end
-
 "Given J(ω), compute the thermalized spectral density function."
 function thermalize_sdf(x, sdf, β)
     return 0.5 * (1 + coth(0.5 * x * β)) * sign(x) * sdf(abs(x))

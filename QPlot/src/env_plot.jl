@@ -174,12 +174,10 @@ function animate_envmodes(time::Vector{Float64}, modes::Vector{Float64}, occupat
 
 end
 
-
 function animate_envmodes(time::Vector{Float64}, modes::Vector{Float64}, occupations::Matrix{Float64}, J, ωs::Float64, θs::Vector{Float64}, β::Float64, s::Float64, outdir::AbstractString; xmin=-1, xmax=1)
 
     # 1. Collect data
-    # xs (modes), ys (occupations) to be updated
-    ts = round.(time, digits = 1) # Labels, to be updated
+    ts = round.(time, digits = 1)
     # ± ωs transition frequency for Hs
     freq = θs           # positive transition frquency Ks, to be updated
     negfreq = -freq     # negative transition frquency Ks, to be updated
@@ -187,8 +185,9 @@ function animate_envmodes(time::Vector{Float64}, modes::Vector{Float64}, occupat
     support = [minimum(modes), maximum(modes)]
     sdfx = collect(range(support..., 1000))
     sdfy = [ J(x) for x in sdfx ]
-    scaled_sdfy = sdfy ./ maximum(sdfy) .* (0.5 * maximum(ns[10,:]))
-
+    scaled_sdfy = sdfy ./ maximum(sdfy) .* (0.5 * maximum(occupations[400,:]))
+    
+    # Stepping function that returns the new data
     function progress_for_one_step!(i, ys, labels, vs, negvs)
         i += 1
         return i, ys[i, :], labels[i], vs[i], negvs[i]
@@ -211,15 +210,13 @@ function animate_envmodes(time::Vector{Float64}, modes::Vector{Float64}, occupat
         ylabel = L"\langle n_\omega \rangle",
         title = text,
     )
-
-    # Set y-axis limits
-    ylims!(ax, 0, maximum[end,:] * 11 / 10) # add 10% for better visibility
-    # Set x-axis limits
-    xlims!(ax, xmin, xmax)
+    # Set ylims considering the maximum value in `ns`
+    ymax = maximum(maximum(occupations)) * 11 / 10 #  Add 10% buffer for visibility.
+    ylims!(ax, 0, ymax)
     
     lines!(
         ax,
-        xs,
+        modes,
         obs_ys,
         color = :darkorange1,
         label = L"\beta=%$(β),\,s=%$(s)",
@@ -273,4 +270,3 @@ function animate_envmodes(time::Vector{Float64}, modes::Vector{Float64}, occupat
     end
 
 end
-
