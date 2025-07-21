@@ -1,0 +1,41 @@
+{
+    "integration": {
+        "env_measurement_step": 100,
+        "tmax": 101,
+        "measurement_step": 1,
+        "time_step": 0.01
+    },
+    "interaction": "Z",
+    "chain": {
+        "local_dim": 6,
+        "size": 500
+    },
+    "notes": {
+        "H_system": "Hs = ε * Z + Δ * X ",
+        "H_interaction": "Z ⊗ ∑ (b† + b)"
+    },
+    "qubit": {
+        "epsilon": 0.0,
+        "delta": 0.1
+    },
+    "environment": {
+        "domain": [
+            0,
+            10
+        ],
+        "nquad": 10000,
+        "spectral_density_parameters": [
+            0.1,
+            2.0,
+            1.0,
+            4.0
+        ],
+        "spectral_density_function": "pi/2 * a[1] * a[4] * a[3] * (x/a[3])^a[2] * exp( -a[2] * x/a[3] )",
+        "β": 50
+    },
+    "mps": {
+        "cutoff": 1.0e-14,
+        "minBondDim": 5,
+        "maxBondDim": 100
+    }
+}

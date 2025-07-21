@@ -89,7 +89,7 @@ function qmap2gen(qmap::Vector{Matrix{ComplexF64}}, dt::Float64)
     # Sanity check: Φ⁻¹ ⋅ Φ = 1
     I4 = Matrix{ComplexF64}(I, 4, 4)
     for t in axes(qmap, 1)
-        @assert inv_qmap[t] * qmap[t] ≈ I4
+        @assert inv_qmap[t] * qmap[t] ≈ I4 "Failed at t = $(t * dt)"
     end
 
     # Compute ∂ₜ Φₜ
@@ -111,7 +111,7 @@ function qmap2gen(qmap::Vector{Matrix{ComplexF64}}, dt::Float64)
     gen = d_qmap .* inv_qmap
     # Sanity check: L(t) ⋅ Φₜ = ∂ₜΦₜ
     for t in axes(qmap, 1)
-        @assert gen[t] * qmap[t] ≈ d_qmap[t]
+        @assert gen[t] * qmap[t] ≈ d_qmap[t] "Failed at t = $(t * dt)"
     end
 
     return gen
